@@ -6,11 +6,11 @@ services:
     environment:
       - PORT=3002
       - CORS_ORIGIN=*
-      - PAC_HOST=192.168.86.28
-      - PAC_PORT=8889
-      - PAC_PASSWORD=999999
-      - NUSSBAUM_REZ_HOST=therm-control.local
-      - NUSSBAUM_ETAGE_HOST=therm-control-2.local
+      - PAC_HOST=${PAC_HOST:-192.168.86.28}
+      - PAC_PORT=${PAC_PORT:-8889}
+      - PAC_PASSWORD=${PAC_PASSWORD:-999999}
+      - NUSSBAUM_REZ_HOST=${NUSSBAUM_REZ_HOST:-therm-control.local}
+      - NUSSBAUM_ETAGE_HOST=${NUSSBAUM_ETAGE_HOST:-therm-control-2.local}
       - POLL_INTERVAL=10000
       - NUSSBAUM_POLL_INTERVAL=30000
     networks:
