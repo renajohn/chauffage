@@ -49,6 +49,12 @@ export interface Pressures {
   low: number;
 }
 
+export interface HeatingCurve {
+  endPoint: number;
+  parallelOffset: number;
+  deltaReduction: number;
+}
+
 export interface HeatPumpData {
   timestamp: string;
   connected: boolean;
@@ -58,6 +64,7 @@ export interface HeatPumpData {
   runtime: RuntimeStats;
   errors: ErrorEntry[];
   pressures: Pressures;
+  heatingCurve: HeatingCurve;
 }
 
 export interface ControlParameter {
