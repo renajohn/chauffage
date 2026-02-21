@@ -6,16 +6,23 @@ import type { HistoryPoint } from '../types/heatpump';
 
 const DATA_DIR = path.join(__dirname, '../../data');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'history-settings.json');
 const SAMPLE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 let history: HistoryPoint[] = [];
 let sampleTimer: NodeJS.Timeout | null = null;
+let enabled = true;
 
 // Load history from disk at startup
 try {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 } catch { /* exists */ }
+
+try {
+  const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+  enabled = settings.enabled !== false;
+} catch { /* default enabled */ }
 
 try {
   history = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8'));
@@ -68,11 +75,43 @@ function sample(): void {
   console.log(`[History] Échantillon enregistré (${history.length} points, outdoor=${point.outdoorTemp}°C)`);
 }
 
+function stopSampling(): void {
+  if (sampleTimer) {
+    clearInterval(sampleTimer);
+    sampleTimer = null;
+    console.log('[History] Échantillonnage arrêté');
+  }
+}
+
 export function startHistorySampling(): void {
+  if (!enabled) {
+    console.log('[History] Collecte désactivée, échantillonnage non démarré');
+    return;
+  }
   // Take first sample immediately
   sample();
   sampleTimer = setInterval(sample, SAMPLE_INTERVAL_MS);
   console.log(`[History] Échantillonnage démarré (intervalle: ${SAMPLE_INTERVAL_MS / 1000}s)`);
+}
+
+export function getHistoryEnabled(): boolean {
+  return enabled;
+}
+
+export function setHistoryEnabled(v: boolean): void {
+  enabled = v;
+  fs.writeFile(SETTINGS_FILE, JSON.stringify({ enabled }), (err) => {
+    if (err) console.error('[History] Erreur sauvegarde settings:', err);
+  });
+  if (enabled) {
+    if (!sampleTimer) {
+      sample();
+      sampleTimer = setInterval(sample, SAMPLE_INTERVAL_MS);
+      console.log('[History] Échantillonnage repris');
+    }
+  } else {
+    stopSampling();
+  }
 }
 
 export function getHistory(): HistoryPoint[] {

@@ -16,7 +16,12 @@ export default function App() {
       <header className="border-b bg-card sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-xl">🌍</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" className="w-6 h-6">
+              <path d="M16 3L2 15h4v13h20V15h4L16 3z" fill="#2563eb"/>
+              <path d="M12 17c0-2 2-3 2-5s-2-3-2-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+              <path d="M16 17c0-2 2-3 2-5s-2-3-2-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+              <path d="M20 17c0-2 2-3 2-5s-2-3-2-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+            </svg>
             <div>
               <h1 className="text-lg font-bold">Chauffage</h1>
               <p className="text-xs text-muted-foreground">PAC géothermique + Nussbaum Therm-Control</p>

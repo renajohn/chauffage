@@ -24,6 +24,7 @@ export function HeatingCurvePage({ data, roomsData, onControl }: HeatingCurvePag
   const [deltaReduction, setDeltaReduction] = useState<number | null>(null)
   const [desiredTemp, setDesiredTemp] = useState(21)
   const [history, setHistory] = useState<HistoryPoint[]>([])
+  const [historyEnabled, setHistoryEnabled] = useState(true)
   const [confirm, setConfirm] = useState(false)
   const [pending, setPending] = useState(false)
 
@@ -51,6 +52,30 @@ export function HeatingCurvePage({ data, roomsData, onControl }: HeatingCurvePag
     const interval = setInterval(fetchHistory, 60_000)
     return () => clearInterval(interval)
   }, [fetchHistory])
+
+  // Fetch history settings
+  useEffect(() => {
+    fetch('/api/history/settings')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setHistoryEnabled(d.enabled) })
+      .catch(() => {})
+  }, [])
+
+  async function toggleHistoryEnabled() {
+    const next = !historyEnabled
+    setHistoryEnabled(next)
+    try {
+      const res = await fetch('/api/history/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: next }),
+      })
+      if (res.ok) {
+        const d = await res.json()
+        setHistoryEnabled(d.enabled)
+      }
+    } catch { /* ignore */ }
+  }
 
   // Set default desired temp from room averages
   useEffect(() => {
@@ -145,9 +170,20 @@ export function HeatingCurvePage({ data, roomsData, onControl }: HeatingCurvePag
           history={history}
           showSavedCurve={showSavedCurve}
         />
-        <p className="text-xs text-muted-foreground mt-2 text-center">
-          {history.length} point(s) d'historique ({Math.round(history.length * 10 / 60)}h de données)
-        </p>
+        <div className="flex items-center justify-center gap-3 mt-2">
+          <p className="text-xs text-muted-foreground">
+            {history.length} point(s) d'historique ({Math.round(history.length * 10 / 60)}h de données)
+          </p>
+          <button
+            onClick={toggleHistoryEnabled}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span className={`inline-block w-7 h-4 rounded-full relative transition-colors ${historyEnabled ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+              <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${historyEnabled ? 'left-3.5' : 'left-0.5'}`} />
+            </span>
+            Collecte
+          </button>
+        </div>
       </div>
 
       {/* Side panel */}

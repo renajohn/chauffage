@@ -11,21 +11,19 @@ export function checkCoolingSync(data: HeatPumpData): void {
   // Detect cooling mode from PAC operating state
   const isCooling = data.operatingState.mode === 'Refroidissement';
 
-  // Skip if no change or first run
+  // Skip if no change
   if (lastPacCooling === isCooling) return;
 
   const wasNull = lastPacCooling === null;
   lastPacCooling = isCooling;
 
-  // On first run, just record the state without sending commands
   if (wasNull) {
-    console.log(`[Coordinator] État initial PAC: cooling = ${isCooling}`);
-    return;
+    console.log(`[Coordinator] Sync initiale: cooling = ${isCooling}`);
+  } else {
+    console.log(`[Coordinator] Transition PAC: cooling ${!isCooling} → ${isCooling}`);
   }
 
-  console.log(`[Coordinator] Transition PAC: cooling ${!isCooling} → ${isCooling}`);
-
-  // Sync both controllers
+  // Sync both controllers (including on first poll)
   Promise.all([
     setCoolingMode('rez', isCooling),
     setCoolingMode('etage', isCooling),

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getCachedData } from '../services/luxtronik';
 import { getCachedRoomsData } from '../services/nussbaum';
-import { getHistory } from '../services/history';
+import { getHistory, getHistoryEnabled, setHistoryEnabled } from '../services/history';
 
 const router = Router();
 
@@ -25,6 +25,20 @@ router.get('/rooms', (_req: Request, res: Response) => {
 
 router.get('/history', (_req: Request, res: Response) => {
   res.json(getHistory());
+});
+
+router.get('/history/settings', (_req: Request, res: Response) => {
+  res.json({ enabled: getHistoryEnabled() });
+});
+
+router.post('/history/settings', (req: Request, res: Response) => {
+  const { enabled } = req.body;
+  if (typeof enabled !== 'boolean') {
+    res.status(400).json({ error: 'enabled must be a boolean' });
+    return;
+  }
+  setHistoryEnabled(enabled);
+  res.json({ enabled: getHistoryEnabled() });
 });
 
 router.get('/system', (_req: Request, res: Response) => {
