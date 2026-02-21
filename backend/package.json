@@ -11,6 +11,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "luxtronik2": "^2.7.2",
+    "modbus-serial": "^8.0.23",
     "ws": "^8.18.0"
   },
   "devDependencies": {

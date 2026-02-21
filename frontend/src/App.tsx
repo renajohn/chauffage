@@ -3,7 +3,7 @@ import { Dashboard } from '@/components/Dashboard'
 import { Badge } from '@/components/ui/badge'
 
 export default function App() {
-  const { data, wsConnected, error, sendControl } = useHeatPump()
+  const { data, roomsData, wsConnected, error, sendControl, setRoomTemperature, renameRoom } = useHeatPump()
 
   return (
     <div className="min-h-screen bg-background">
@@ -13,8 +13,8 @@ export default function App() {
           <div className="flex items-center gap-3">
             <span className="text-xl">🌍</span>
             <div>
-              <h1 className="text-lg font-bold">Alpha Innotec</h1>
-              <p className="text-xs text-muted-foreground">Pompe à chaleur géothermique</p>
+              <h1 className="text-lg font-bold">Chauffage</h1>
+              <p className="text-xs text-muted-foreground">PAC géothermique + Nussbaum Therm-Control</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -24,6 +24,11 @@ export default function App() {
             <Badge variant={wsConnected ? 'success' : 'warning'}>
               {wsConnected ? 'Connecté' : 'Déconnecté'}
             </Badge>
+            {roomsData && (
+              <Badge variant={roomsData.connected ? 'success' : 'destructive'} className="text-xs">
+                NB {roomsData.connected ? 'OK' : 'HS'}
+              </Badge>
+            )}
             {data && (
               <span className="text-xs text-muted-foreground hidden sm:inline">
                 {new Date(data.timestamp).toLocaleTimeString('fr-FR')}
@@ -43,7 +48,13 @@ export default function App() {
             </div>
           </div>
         ) : (
-          <Dashboard data={data} onControl={sendControl} />
+          <Dashboard
+            data={data}
+            onControl={sendControl}
+            roomsData={roomsData}
+            onRoomTemperature={setRoomTemperature}
+            onRenameRoom={renameRoom}
+          />
         )}
       </main>
     </div>

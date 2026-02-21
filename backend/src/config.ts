@@ -11,4 +11,9 @@ export const config = {
   polling: {
     intervalMs: parseInt(process.env.POLL_INTERVAL || '10000', 10),
   },
+  nussbaum: {
+    rez: { host: process.env.NUSSBAUM_REZ_HOST || 'therm-control.local' },
+    etage: { host: process.env.NUSSBAUM_ETAGE_HOST || 'therm-control-2.local' },
+    pollIntervalMs: parseInt(process.env.NUSSBAUM_POLL_INTERVAL || '30000', 10),
+  },
 };

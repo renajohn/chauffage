@@ -1,15 +1,29 @@
 import { useState, useCallback } from 'react'
 import type { HeatPumpData } from '@/types/heatpump'
+import type { RoomsData } from '@/types/nussbaum'
 import { useWebSocket } from './useWebSocket'
 
 const WS_URL = `ws://${window.location.hostname}:3002`
 
 export function useHeatPump() {
   const [data, setData] = useState<HeatPumpData | null>(null)
+  const [roomsData, setRoomsData] = useState<RoomsData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const onMessage = useCallback((raw: unknown) => {
-    setData(raw as HeatPumpData)
+    const msg = raw as Record<string, unknown>
+
+    // Detect envelope format: { type: 'heatpump'|'rooms', data: ... }
+    if (msg && typeof msg === 'object' && 'type' in msg && 'data' in msg) {
+      if (msg.type === 'heatpump') {
+        setData(msg.data as HeatPumpData)
+      } else if (msg.type === 'rooms') {
+        setRoomsData(msg.data as RoomsData)
+      }
+    } else {
+      // Legacy format: raw HeatPumpData
+      setData(msg as HeatPumpData)
+    }
     setError(null)
   }, [])
 
@@ -34,10 +48,60 @@ export function useHeatPump() {
     }
   }, [])
 
+  const setRoomTemperature = useCallback(async (controllerId: 'rez' | 'etage', roomId: number, temperature: number) => {
+    try {
+      const res = await fetch(`/api/rooms/${controllerId}/${roomId}/temperature`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ temperature }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erreur inconnue')
+      }
+      return await res.json()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erreur de communication'
+      setError(msg)
+      throw err
+    }
+  }, [])
+
+  const renameRoom = useCallback(async (controllerId: 'rez' | 'etage', roomId: number, name: string) => {
+    try {
+      const res = await fetch(`/api/rooms/${controllerId}/${roomId}/label`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erreur inconnue')
+      }
+      // Update local state immediately
+      if (roomsData) {
+        setRoomsData({
+          ...roomsData,
+          rooms: roomsData.rooms.map(r =>
+            r.controllerId === controllerId && r.id === roomId ? { ...r, name } : r
+          ),
+        })
+      }
+      return await res.json()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erreur de communication'
+      setError(msg)
+      throw err
+    }
+  }, [roomsData])
+
   return {
     data,
+    roomsData,
     wsConnected,
     error,
     sendControl,
+    setRoomTemperature,
+    renameRoom,
   }
 }

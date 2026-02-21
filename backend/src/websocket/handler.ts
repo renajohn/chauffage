@@ -1,6 +1,11 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server } from 'http';
 import { HeatPumpData } from '../types/heatpump';
+import { RoomsData } from '../types/nussbaum';
+
+type WsMessage =
+  | { type: 'heatpump'; data: HeatPumpData }
+  | { type: 'rooms'; data: RoomsData };
 
 let wss: WebSocketServer | null = null;
 
@@ -23,14 +28,22 @@ export function setupWebSocket(server: Server): WebSocketServer {
   return wss;
 }
 
-export function broadcastData(data: HeatPumpData): void {
+function broadcast(message: WsMessage): void {
   if (!wss) return;
 
-  const message = JSON.stringify(data);
+  const json = JSON.stringify(message);
 
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
+      client.send(json);
     }
   });
+}
+
+export function broadcastData(data: HeatPumpData): void {
+  broadcast({ type: 'heatpump', data });
+}
+
+export function broadcastRoomsData(data: RoomsData): void {
+  broadcast({ type: 'rooms', data });
 }

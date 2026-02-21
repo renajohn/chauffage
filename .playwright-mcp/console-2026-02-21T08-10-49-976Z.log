@@ -1,0 +1,2 @@
+[     862ms] [WARNING] WebSocket connection to 'ws://localhost:3002/' failed: WebSocket is closed before the connection is established. @ http://localhost:5174/src/hooks/useWebSocket.ts:37
+[     876ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:5174/favicon.ico:0

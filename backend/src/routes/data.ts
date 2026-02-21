@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { getCachedData } from '../services/luxtronik';
+import { getCachedRoomsData } from '../services/nussbaum';
 
 const router = Router();
 
@@ -10,6 +11,22 @@ router.get('/data', (_req: Request, res: Response) => {
     return;
   }
   res.json(data);
+});
+
+router.get('/rooms', (_req: Request, res: Response) => {
+  const data = getCachedRoomsData();
+  if (!data) {
+    res.status(503).json({ error: 'Données Nussbaum non disponibles.' });
+    return;
+  }
+  res.json(data);
+});
+
+router.get('/system', (_req: Request, res: Response) => {
+  res.json({
+    heatpump: getCachedData(),
+    rooms: getCachedRoomsData(),
+  });
 });
 
 export default router;
