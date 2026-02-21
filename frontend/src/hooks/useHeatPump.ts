@@ -3,7 +3,8 @@ import type { HeatPumpData } from '@/types/heatpump'
 import type { RoomsData } from '@/types/nussbaum'
 import { useWebSocket } from './useWebSocket'
 
-const WS_URL = `ws://${window.location.hostname}:3002`
+const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+const WS_URL = `${wsProtocol}//${window.location.host}/ws`
 
 export function useHeatPump() {
   const [data, setData] = useState<HeatPumpData | null>(null)
@@ -22,7 +23,7 @@ export function useHeatPump() {
       }
     } else {
       // Legacy format: raw HeatPumpData
-      setData(msg as HeatPumpData)
+      setData(msg as unknown as HeatPumpData)
     }
     setError(null)
   }, [])
@@ -95,6 +96,21 @@ export function useHeatPump() {
     }
   }, [roomsData])
 
+  const resetErrors = useCallback(async () => {
+    try {
+      const res = await fetch('/api/controls/reset-errors', { method: 'POST' })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Erreur inconnue')
+      }
+      return await res.json()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erreur de communication'
+      setError(msg)
+      throw err
+    }
+  }, [])
+
   return {
     data,
     roomsData,
@@ -103,5 +119,6 @@ export function useHeatPump() {
     sendControl,
     setRoomTemperature,
     renameRoom,
+    resetErrors,
   }
 }

@@ -115,4 +115,25 @@ export const explanations: Record<string, Explanation> = {
     label: 'Impulsions compresseur',
     description: "Nombre de démarrages du compresseur. Un nombre élevé par rapport aux heures peut indiquer un cycle court (problème de dimensionnement ou de régulation).",
   },
+  // Courbe de chauffe
+  heatingCurveEndPoint: {
+    label: 'Fin de courbe',
+    description: "Température cible du retour chauffage lorsqu'il fait -15°C dehors. Augmenter cette valeur donne plus de chaleur par grand froid.",
+    range: '20°C à 70°C',
+  },
+  heatingCurveParallelOffset: {
+    label: 'Pied de courbe',
+    description: "Température cible du retour chauffage lorsqu'il fait +20°C dehors. Décale toute la courbe vers le haut ou le bas. Influence surtout la mi-saison.",
+    range: '5°C à 35°C',
+  },
+  heatingCurveDeltaReduction: {
+    label: 'Abaissement nuit',
+    description: "Réduction de la température cible en mode réduit (nuit). La courbe est décalée vers le bas de cette valeur pendant les heures de réduction.",
+    range: '-15°C à 10°C',
+  },
+  desiredRoomTemp: {
+    label: 'Temp. ambiante souhaitée',
+    description: "Température que vous souhaitez mesurer dans les pièces de la maison (mesure des thermostats Nussbaum). L'assistant compare cette valeur aux températures réelles des chambres pour recommander des ajustements de courbe.",
+    range: '18°C à 25°C',
+  },
 }

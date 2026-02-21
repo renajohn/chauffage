@@ -49,6 +49,12 @@ export interface Pressures {
   low: number
 }
 
+export interface HeatingCurve {
+  endPoint: number
+  parallelOffset: number
+  deltaReduction: number
+}
+
 export interface HeatPumpData {
   timestamp: string
   connected: boolean
@@ -58,6 +64,17 @@ export interface HeatPumpData {
   runtime: RuntimeStats
   errors: ErrorEntry[]
   pressures: Pressures
+  heatingCurve: HeatingCurve
+}
+
+export interface HistoryPoint {
+  timestamp: number
+  outdoorTemp: number
+  returnTemp: number
+  returnTarget: number
+  flowTemp: number
+  avgRoomTemp: number | null
+  avgRoomTarget: number | null
 }
 
 export const OPERATION_MODES: Record<number, string> = {

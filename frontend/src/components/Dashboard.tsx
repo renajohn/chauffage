@@ -14,21 +14,22 @@ interface DashboardProps {
   roomsData: RoomsData | null
   onRoomTemperature: (controllerId: 'rez' | 'etage', roomId: number, temperature: number) => Promise<void>
   onRenameRoom: (controllerId: 'rez' | 'etage', roomId: number, name: string) => Promise<void>
+  onResetErrors: () => Promise<unknown>
 }
 
-export function Dashboard({ data, onControl, roomsData, onRoomTemperature, onRenameRoom }: DashboardProps) {
+export function Dashboard({ data, onControl, roomsData, onRoomTemperature, onRenameRoom, onResetErrors }: DashboardProps) {
   const { temperatures: t, outputs, operatingState, runtime, errors, pressures } = data
 
   const temperatureCards = [
-    { key: 'outdoor', label: 'Extérieure', value: t.outdoor, icon: '🌡️' },
-    { key: 'outdoorAvg24h', label: 'Moy. ext. 24h', value: t.outdoorAvg24h, icon: '📊' },
-    { key: 'heatingFlow', label: 'Départ chauffage', value: t.heatingFlow, icon: '↗️' },
-    { key: 'heatingReturn', label: 'Retour chauffage', value: t.heatingReturn, icon: '↙️', target: t.heatingReturnTarget },
-    { key: 'heatingReturnTarget', label: 'Consigne retour', value: t.heatingReturnTarget, icon: '🎯' },
-    { key: 'hotWater', label: 'Eau chaude (ECS)', value: t.hotWater, icon: '🚿', target: operatingState.hotWaterTargetTemp },
-    { key: 'sourceIn', label: 'Source entrée', value: t.sourceIn, icon: '⬇️' },
-    { key: 'sourceOut', label: 'Source sortie', value: t.sourceOut, icon: '⬆️' },
-    { key: 'hotGas', label: 'Gaz chaud', value: t.hotGas, icon: '🔥' },
+    { key: 'outdoor', label: 'Extérieure (TA)', value: t.outdoor, icon: '🌡️' },
+    { key: 'outdoorAvg24h', label: 'Moy. ext. 24h (TA 24h)', value: t.outdoorAvg24h, icon: '📊' },
+    { key: 'heatingFlow', label: 'Départ chauffage (TVL)', value: t.heatingFlow, icon: '↗️' },
+    { key: 'heatingReturn', label: 'Retour chauffage (TRL)', value: t.heatingReturn, icon: '↙️', target: t.heatingReturnTarget },
+    { key: 'heatingReturnTarget', label: 'Consigne retour (TRL Soll)', value: t.heatingReturnTarget, icon: '🎯' },
+    { key: 'hotWater', label: 'Eau chaude (TBW)', value: t.hotWater, icon: '🚿', target: operatingState.hotWaterTargetTemp },
+    { key: 'sourceIn', label: 'Source entrée (TEE)', value: t.sourceIn, icon: '⬇️' },
+    { key: 'sourceOut', label: 'Source sortie (TAE)', value: t.sourceOut, icon: '⬆️' },
+    { key: 'hotGas', label: 'Gaz chaud (THG)', value: t.hotGas, icon: '🔥' },
   ]
 
   return (
@@ -89,7 +90,7 @@ export function Dashboard({ data, onControl, roomsData, onRoomTemperature, onRen
       <section>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <RuntimeStats stats={runtime} />
-          <ErrorLog errors={errors} />
+          <ErrorLog errors={errors} onReset={onResetErrors} />
         </div>
       </section>
     </div>

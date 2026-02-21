@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import type { ErrorEntry } from '@/types/heatpump'
 import { translateError, type TranslatedError } from '@/lib/errorTranslations'
 
 interface ErrorLogProps {
   errors: ErrorEntry[]
+  onReset?: () => Promise<unknown>
 }
 
 function formatDate(ts: string): string {
@@ -63,13 +66,43 @@ function ErrorItem({ error }: { error: ErrorEntry }) {
   )
 }
 
-export function ErrorLog({ errors }: ErrorLogProps) {
+export function ErrorLog({ errors, onReset }: ErrorLogProps) {
+  const [pending, setPending] = useState(false)
+  const [confirm, setConfirm] = useState(false)
+
+  async function handleReset() {
+    if (!confirm) {
+      setConfirm(true)
+      return
+    }
+    if (!onReset) return
+    setPending(true)
+    setConfirm(false)
+    try {
+      await onReset()
+    } finally {
+      setPending(false)
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2">
-          <span>⚠️</span> Dernières erreurs
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <span>⚠️</span> Dernières erreurs
+          </CardTitle>
+          {onReset && errors.length > 0 && (
+            <Button
+              size="sm"
+              variant={confirm ? 'destructive' : 'outline'}
+              onClick={handleReset}
+              disabled={pending}
+            >
+              {pending ? 'Reset...' : confirm ? 'Confirmer reset ?' : 'Reset erreurs'}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {errors.length === 0 ? (

@@ -40,25 +40,25 @@ export function SystemStatus({ outputs, mode, pressures }: SystemStatusProps) {
           </Badge>
         </div>
 
-        <StatusIndicator label="Compresseur" active={outputs.compressor} paramKey="compressor" />
+        <StatusIndicator label="Compresseur (VD1)" active={outputs.compressor} paramKey="compressor" />
         <StatusIndicator label="Pompe chauffage (HUP)" active={outputs.heatingPump} paramKey="heatingPump" />
         <StatusIndicator label="Pompe saumure (VBO)" active={outputs.brinePump} paramKey="brinePump" />
         <StatusIndicator label="Vanne ECS (BUP)" active={outputs.hotWaterValve} paramKey="hotWaterValve" />
         <StatusIndicator label="Pompe bouclage (ZUP)" active={outputs.recirculationPump} paramKey="recirculationPump" />
-        <StatusIndicator label="Vanne dégivrage" active={outputs.defrostValve} paramKey="defrostValve" />
+        <StatusIndicator label="Vanne dégivrage (AV)" active={outputs.defrostValve} paramKey="defrostValve" />
 
         {(pressures.high > 0 || pressures.low > 0) && (
           <div className="border-t pt-3 mt-3 space-y-1.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm">Pression haute</span>
+                <span className="text-sm">Pression haute (HD)</span>
                 <InfoTooltip paramKey="pressureHigh" />
               </div>
               <span className="text-sm font-mono">{pressures.high.toFixed(1)} bar</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm">Pression basse</span>
+                <span className="text-sm">Pression basse (ND)</span>
                 <InfoTooltip paramKey="pressureLow" />
               </div>
               <span className="text-sm font-mono">{pressures.low.toFixed(1)} bar</span>

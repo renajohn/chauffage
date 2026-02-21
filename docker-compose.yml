@@ -1,0 +1,31 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      - PORT=3002
+      - CORS_ORIGIN=*
+      - PAC_HOST=192.168.86.28
+      - PAC_PORT=8889
+      - PAC_PASSWORD=999999
+      - NUSSBAUM_REZ_HOST=therm-control.local
+      - NUSSBAUM_ETAGE_HOST=therm-control-2.local
+      - POLL_INTERVAL=10000
+      - NUSSBAUM_POLL_INTERVAL=30000
+    networks:
+      - chauffage
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "8050:80"
+    depends_on:
+      - backend
+    networks:
+      - chauffage
+
+networks:
+  chauffage:

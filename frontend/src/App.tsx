@@ -1,9 +1,14 @@
+import { useState } from 'react'
 import { useHeatPump } from '@/hooks/useHeatPump'
 import { Dashboard } from '@/components/Dashboard'
+import { HeatingCurvePage } from '@/components/HeatingCurvePage'
 import { Badge } from '@/components/ui/badge'
 
+type Tab = 'dashboard' | 'curve'
+
 export default function App() {
-  const { data, roomsData, wsConnected, error, sendControl, setRoomTemperature, renameRoom } = useHeatPump()
+  const { data, roomsData, wsConnected, error, sendControl, setRoomTemperature, renameRoom, resetErrors } = useHeatPump()
+  const [tab, setTab] = useState<Tab>('dashboard')
 
   return (
     <div className="min-h-screen bg-background">
@@ -36,6 +41,31 @@ export default function App() {
             )}
           </div>
         </div>
+        {/* Tab navigation */}
+        <div className="max-w-7xl mx-auto px-4">
+          <nav className="flex gap-1 -mb-px">
+            <button
+              onClick={() => setTab('dashboard')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                tab === 'dashboard'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              }`}
+            >
+              Tableau de bord
+            </button>
+            <button
+              onClick={() => setTab('curve')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                tab === 'curve'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              }`}
+            >
+              Courbe de chauffe
+            </button>
+          </nav>
+        </div>
       </header>
 
       {/* Main content */}
@@ -47,13 +77,20 @@ export default function App() {
               <p className="text-muted-foreground">Connexion à la pompe à chaleur...</p>
             </div>
           </div>
-        ) : (
+        ) : tab === 'dashboard' ? (
           <Dashboard
             data={data}
             onControl={sendControl}
             roomsData={roomsData}
             onRoomTemperature={setRoomTemperature}
             onRenameRoom={renameRoom}
+            onResetErrors={resetErrors}
+          />
+        ) : (
+          <HeatingCurvePage
+            data={data}
+            roomsData={roomsData}
+            onControl={sendControl}
           />
         )}
       </main>

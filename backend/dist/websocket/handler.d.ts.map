@@ -1,1 +1,0 @@
-{"version":3,"file":"handler.d.ts","sourceRoot":"","sources":["../../src/websocket/handler.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,eAAe,EAAa,MAAM,IAAI,CAAC;AAChD,OAAO,EAAE,MAAM,EAAE,MAAM,MAAM,CAAC;AAC9B,OAAO,EAAE,YAAY,EAAE,MAAM,mBAAmB,CAAC;AAIjD,wBAAgB,cAAc,CAAC,MAAM,EAAE,MAAM,GAAG,eAAe,CAiB9D;AAED,wBAAgB,aAAa,CAAC,IAAI,EAAE,YAAY,GAAG,IAAI,CAUtD"}
