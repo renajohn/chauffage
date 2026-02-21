@@ -1,2 +1,0 @@
-[     176ms] [WARNING] WebSocket connection to 'ws://localhost:3002/' failed: WebSocket is closed before the connection is established. @ http://localhost:5173/src/hooks/useWebSocket.ts:37
-[   96144ms] [WARNING] WebSocket connection to 'ws://localhost:3002/' failed: WebSocket is closed before the connection is established. @ http://localhost:5173/src/hooks/useWebSocket.ts:37
