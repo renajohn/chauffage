@@ -12,12 +12,13 @@ interface DashboardProps {
   data: HeatPumpData
   onControl: (parameter: string, value: number) => Promise<unknown>
   roomsData: RoomsData | null
+  roomsStale?: boolean
   onRoomTemperature: (controllerId: 'rez' | 'etage', roomId: number, temperature: number) => Promise<void>
   onRenameRoom: (controllerId: 'rez' | 'etage', roomId: number, name: string) => Promise<void>
   onResetErrors: () => Promise<unknown>
 }
 
-export function Dashboard({ data, onControl, roomsData, onRoomTemperature, onRenameRoom, onResetErrors }: DashboardProps) {
+export function Dashboard({ data, onControl, roomsData, roomsStale, onRoomTemperature, onRenameRoom, onResetErrors }: DashboardProps) {
   const { temperatures: t, outputs, operatingState, runtime, errors, pressures } = data
 
   const temperatureCards = [
@@ -36,7 +37,7 @@ export function Dashboard({ data, onControl, roomsData, onRoomTemperature, onRen
     <div className="space-y-8">
       {/* Section 1: Zones de chauffage (Nussbaum) — en haut */}
       {roomsData ? (
-        <RoomGrid roomsData={roomsData} onRoomTemperature={onRoomTemperature} onRename={onRenameRoom} />
+        <RoomGrid roomsData={roomsData} refreshing={roomsStale} onRoomTemperature={onRoomTemperature} onRename={onRenameRoom} />
       ) : (
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Zones de chauffage</h2>

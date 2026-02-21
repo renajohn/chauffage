@@ -9,6 +9,7 @@ const WS_URL = `${wsProtocol}//${window.location.host}/ws`
 export function useHeatPump() {
   const [data, setData] = useState<HeatPumpData | null>(null)
   const [roomsData, setRoomsData] = useState<RoomsData | null>(null)
+  const [roomsStale, setRoomsStale] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const onMessage = useCallback((raw: unknown) => {
@@ -19,7 +20,11 @@ export function useHeatPump() {
       if (msg.type === 'heatpump') {
         setData(msg.data as HeatPumpData)
       } else if (msg.type === 'rooms') {
-        setRoomsData(msg.data as RoomsData)
+        const rooms = msg.data as RoomsData
+        setRoomsData(rooms)
+        // Data older than 60s is stale (from disk cache or old poll)
+        const age = Date.now() - new Date(rooms.timestamp).getTime()
+        setRoomsStale(age > 60_000)
       }
     } else {
       // Legacy format: raw HeatPumpData
@@ -114,6 +119,7 @@ export function useHeatPump() {
   return {
     data,
     roomsData,
+    roomsStale,
     wsConnected,
     error,
     sendControl,

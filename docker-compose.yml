@@ -13,6 +13,8 @@ services:
       - NUSSBAUM_ETAGE_HOST=${NUSSBAUM_ETAGE_HOST:-therm-control-2.local}
       - POLL_INTERVAL=10000
       - NUSSBAUM_POLL_INTERVAL=30000
+    volumes:
+      - backend-data:/app/data
     networks:
       - chauffage
 
@@ -26,6 +28,9 @@ services:
       - backend
     networks:
       - chauffage
+
+volumes:
+  backend-data:
 
 networks:
   chauffage:

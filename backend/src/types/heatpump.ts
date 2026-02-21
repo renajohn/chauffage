@@ -67,6 +67,16 @@ export interface HeatPumpData {
   heatingCurve: HeatingCurve;
 }
 
+export interface HistoryPoint {
+  timestamp: number;
+  outdoorTemp: number;
+  returnTemp: number;
+  returnTarget: number;
+  flowTemp: number;
+  avgRoomTemp: number | null;
+  avgRoomTarget: number | null;
+}
+
 export interface ControlParameter {
   parameter: string;
   value: number;

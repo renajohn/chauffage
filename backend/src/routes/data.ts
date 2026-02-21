@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getCachedData } from '../services/luxtronik';
 import { getCachedRoomsData } from '../services/nussbaum';
+import { getHistory } from '../services/history';
 
 const router = Router();
 
@@ -20,6 +21,10 @@ router.get('/rooms', (_req: Request, res: Response) => {
     return;
   }
   res.json(data);
+});
+
+router.get('/history', (_req: Request, res: Response) => {
+  res.json(getHistory());
 });
 
 router.get('/system', (_req: Request, res: Response) => {

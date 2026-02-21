@@ -3,8 +3,15 @@ import path from 'path';
 import { config } from '../config';
 import type { NussbaumRoom, ControllerStatus, DemandSummary, RoomsData } from '../types/nussbaum';
 
+// Persistent data directory (volume-mounted in Docker)
+const DATA_DIR = path.join(__dirname, '../../data');
+try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch { /* exists */ }
+
 // Persistent label overrides file
-const LABELS_FILE = path.join(__dirname, '../../room-labels.json');
+const LABELS_FILE = path.join(DATA_DIR, 'room-labels.json');
+
+// Persistent rooms data cache file
+const CACHE_FILE = path.join(DATA_DIR, 'rooms-cache.json');
 
 function loadLabels(): Record<string, Record<string, string>> {
   try {
@@ -52,9 +59,23 @@ const CONTROLLERS = [
 // XSRF token cache per host
 const xsrfCache = new Map<string, string>();
 
-// Cached rooms data
+// Cached rooms data (initialized from disk cache if available)
 let cachedRoomsData: RoomsData | null = null;
 let pollTimer: NodeJS.Timeout | null = null;
+
+// Load disk cache at startup
+try {
+  cachedRoomsData = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf-8'));
+  console.log(`[Nussbaum] Cache disque chargé (${cachedRoomsData!.rooms.length} pièces, ${cachedRoomsData!.timestamp})`);
+} catch {
+  // No cache file yet, that's fine
+}
+
+function saveCache(data: RoomsData): void {
+  fs.writeFile(CACHE_FILE, JSON.stringify(data), (err) => {
+    if (err) console.error('[Nussbaum] Erreur sauvegarde cache:', err);
+  });
+}
 
 /**
  * Fetch XSRF token from a controller by loading its homepage
@@ -124,15 +145,15 @@ async function controllerGet(host: string, path: string): Promise<any> {
 }
 
 /**
- * Make an authenticated POST request to a controller
+ * Make an authenticated POST request to a controller (form-encoded)
  */
-async function controllerPost(host: string, path: string, body: string): Promise<any> {
+async function controllerPost(host: string, path: string, body: string, contentType = 'application/x-www-form-urlencoded'): Promise<any> {
   const token = await getXsrfToken(host);
   const url = `http://${host}${path}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': contentType,
       'X-XSRF-TOKEN': token,
       'Cookie': `XSRF-TOKEN=${encodeURIComponent(token)}`,
     },
@@ -145,18 +166,20 @@ async function controllerPost(host: string, path: string, body: string): Promise
     const retryRes = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': contentType,
         'X-XSRF-TOKEN': newToken,
         'Cookie': `XSRF-TOKEN=${encodeURIComponent(newToken)}`,
       },
       body,
     });
     if (!retryRes.ok) throw new Error(`HTTP ${retryRes.status} from ${url}`);
-    return retryRes.json();
+    const retryText = await retryRes.text();
+    return retryText ? JSON.parse(retryText) : null;
   }
 
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 /**
@@ -309,6 +332,7 @@ export function startNussbaumPolling(onUpdate: (data: RoomsData) => void): void 
   const poll = async () => {
     try {
       cachedRoomsData = await pollAll();
+      saveCache(cachedRoomsData);
       console.log(`[Nussbaum] ${cachedRoomsData.rooms.length} pièces, ${cachedRoomsData.demand.demandingRooms} en demande`);
       onUpdate(cachedRoomsData);
     } catch (err) {
@@ -363,12 +387,22 @@ export async function setRoomTemperature(
   const ctrl = CONTROLLERS.find((c) => c.id === controllerId);
   if (!ctrl) throw new Error(`Contrôleur inconnu: ${controllerId}`);
 
-  // POST to the room temperature endpoint
-  const params = new URLSearchParams();
-  params.set('temperature', String(temperature));
+  // Fetch current room data to get all fields
+  const rooms = await controllerGet(ctrl.host, '/api/rooms/');
+  const roomList = Array.isArray(rooms) ? rooms : (rooms.rooms ?? []);
+  const room = roomList.find((r: any) => r.id === roomId);
+  if (!room) throw new Error(`Pièce ${roomId} introuvable sur ${ctrl.name}`);
 
-  await controllerPost(ctrl.host, `/api/rooms/${roomId}/temperature/`, params.toString());
-  console.log(`[Nussbaum] ${ctrl.name} pièce ${roomId}: consigne = ${temperature}°C`);
+  // Update temperature and POST full room object (Nussbaum API requires this)
+  room.temperature = temperature;
+  room.changed = 1;
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(room)) {
+    params.set(key, value == null ? '' : String(value));
+  }
+
+  await controllerPost(ctrl.host, `/api/base-stations/${room.baseStation}/rooms/${roomId}/update/`, params.toString());
+  console.log(`[Nussbaum] ${ctrl.name} pièce ${roomId}: consigne = ${temperature}°C (propagation ~30-60s)`);
 }
 
 export function stopNussbaumPolling(): void {

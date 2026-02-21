@@ -5,6 +5,7 @@ import type { RoomsData, ControllerStatus, NussbaumRoom } from '@/types/nussbaum
 
 interface RoomGridProps {
   roomsData: RoomsData
+  refreshing?: boolean
   onRoomTemperature?: (controllerId: 'rez' | 'etage', roomId: number, temperature: number) => Promise<void>
   onRename?: (controllerId: 'rez' | 'etage', roomId: number, name: string) => Promise<void>
 }
@@ -25,7 +26,7 @@ function ControllerHeader({ status }: { status: ControllerStatus }) {
   )
 }
 
-export function RoomGrid({ roomsData, onRoomTemperature, onRename }: RoomGridProps) {
+export function RoomGrid({ roomsData, refreshing, onRoomTemperature, onRename }: RoomGridProps) {
   // Group rooms by controller, demanding first within each group
   const roomsByController = new Map<string, NussbaumRoom[]>()
   for (const room of roomsData.rooms) {
@@ -40,7 +41,15 @@ export function RoomGrid({ roomsData, onRoomTemperature, onRename }: RoomGridPro
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h2 className="text-lg font-semibold">Zones de chauffage</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Zones de chauffage</h2>
+          {refreshing && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground animate-pulse">
+              <div className="h-3 w-3 animate-spin border-[1.5px] border-muted-foreground/30 border-t-muted-foreground rounded-full" />
+              <span>Mise à jour…</span>
+            </div>
+          )}
+        </div>
         <DemandSummary demand={roomsData.demand} />
       </div>
 
@@ -54,6 +63,7 @@ export function RoomGrid({ roomsData, onRoomTemperature, onRename }: RoomGridPro
                 <RoomCard
                   key={`${room.controllerId}-${room.id}`}
                   room={room}
+                  disabled={refreshing || !controller.connected}
                   onTemperatureChange={onRoomTemperature}
                   onRename={onRename}
                 />

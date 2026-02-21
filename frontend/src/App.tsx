@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 type Tab = 'dashboard' | 'curve'
 
 export default function App() {
-  const { data, roomsData, wsConnected, error, sendControl, setRoomTemperature, renameRoom, resetErrors } = useHeatPump()
+  const { data, roomsData, roomsStale, wsConnected, error, sendControl, setRoomTemperature, renameRoom, resetErrors } = useHeatPump()
   const [tab, setTab] = useState<Tab>('dashboard')
 
   return (
@@ -82,6 +82,7 @@ export default function App() {
             data={data}
             onControl={sendControl}
             roomsData={roomsData}
+            roomsStale={roomsStale}
             onRoomTemperature={setRoomTemperature}
             onRenameRoom={renameRoom}
             onResetErrors={resetErrors}

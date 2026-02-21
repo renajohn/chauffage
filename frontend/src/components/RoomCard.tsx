@@ -35,14 +35,17 @@ function SignalIcon({ strength }: { strength: number }) {
 
 interface RoomCardProps {
   room: NussbaumRoom
+  disabled?: boolean
   onTemperatureChange?: (controllerId: 'rez' | 'etage', roomId: number, temperature: number) => Promise<void>
   onRename?: (controllerId: 'rez' | 'etage', roomId: number, name: string) => Promise<void>
 }
 
-export function RoomCard({ room, onTemperatureChange, onRename }: RoomCardProps) {
+export function RoomCard({ room, disabled, onTemperatureChange, onRename }: RoomCardProps) {
   const [sliderTemp, setSliderTemp] = useState<number | null>(null)
   const [pending, setPending] = useState(false)
   const [confirm, setConfirm] = useState(false)
+  const [applyError, setApplyError] = useState(false)
+  const [propagating, setPropagating] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(room.name)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -55,6 +58,11 @@ export function RoomCard({ room, onTemperatureChange, onRename }: RoomCardProps)
     if (editing) inputRef.current?.select()
   }, [editing])
 
+  // Clear propagating state when target temperature updates from backend
+  useEffect(() => {
+    if (propagating) setPropagating(false)
+  }, [room.targetTemperature])
+
   async function handleApply() {
     if (!confirm) {
       setConfirm(true)
@@ -63,9 +71,13 @@ export function RoomCard({ room, onTemperatureChange, onRename }: RoomCardProps)
     if (!onTemperatureChange || sliderTemp === null) return
     setPending(true)
     setConfirm(false)
+    setApplyError(false)
     try {
       await onTemperatureChange(room.controllerId, room.id, sliderTemp)
       setSliderTemp(null)
+      setPropagating(true)
+    } catch {
+      setApplyError(true)
     } finally {
       setPending(false)
     }
@@ -105,9 +117,9 @@ export function RoomCard({ room, onTemperatureChange, onRename }: RoomCardProps)
               />
             ) : (
               <button
-                onClick={() => { if (onRename) { setEditName(room.name); setEditing(true) } }}
-                className="font-medium text-sm text-left truncate hover:underline decoration-dotted cursor-text"
-                title="Cliquer pour renommer"
+                onClick={() => { if (onRename && !disabled) { setEditName(room.name); setEditing(true) } }}
+                className={`font-medium text-sm text-left truncate ${disabled ? '' : 'hover:underline decoration-dotted cursor-text'}`}
+                title={disabled ? undefined : 'Cliquer pour renommer'}
               >
                 {room.name}
               </button>
@@ -128,12 +140,18 @@ export function RoomCard({ room, onTemperatureChange, onRename }: RoomCardProps)
             <span className={`ml-2 ${delta > 0 ? 'text-orange-500' : delta < 0 ? 'text-blue-500' : ''}`}>
               ({delta >= 0 ? '+' : ''}{delta.toFixed(1)}°C)
             </span>
+            {propagating && (
+              <span className="ml-2 inline-flex items-center gap-1 text-primary animate-pulse">
+                <span className="inline-block h-2 w-2 animate-spin border border-primary border-t-transparent rounded-full" />
+                envoi…
+              </span>
+            )}
           </div>
         </div>
 
         {/* Temperature slider */}
         {onTemperatureChange && (
-          <div className="space-y-2">
+          <div className={`space-y-2${disabled ? ' opacity-50 pointer-events-none' : ''}`}>
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">Consigne</span>
               <span className="text-xs font-mono font-medium">{effectiveTarget.toFixed(1)}°C</span>
@@ -144,19 +162,25 @@ export function RoomCard({ room, onTemperatureChange, onRename }: RoomCardProps)
               min={15}
               max={28}
               step={0.5}
+              disabled={disabled}
             />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>15°C</span>
               <span>28°C</span>
             </div>
             {sliderTemp !== null && sliderTemp !== room.targetTemperature && (
-              <div className="flex gap-2">
-                <Button size="sm" onClick={handleApply} disabled={pending}>
-                  {confirm ? 'Confirmer ?' : 'Appliquer'}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => { setSliderTemp(null); setConfirm(false) }}>
-                  Annuler
-                </Button>
+              <div className="space-y-1">
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleApply} disabled={pending || disabled}>
+                    {confirm ? 'Confirmer ?' : 'Appliquer'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setSliderTemp(null); setConfirm(false); setApplyError(false) }}>
+                    Annuler
+                  </Button>
+                </div>
+                {applyError && (
+                  <p className="text-xs text-destructive">Échec — contrôleur injoignable</p>
+                )}
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@ import http from 'http';
 import { config } from './config';
 import { initLuxtronik, startPolling } from './services/luxtronik';
 import { startNussbaumPolling } from './services/nussbaum';
+import { startHistorySampling } from './services/history';
 import { checkCoolingSync } from './services/coordinator';
 import { setupWebSocket, broadcastData, broadcastRoomsData } from './websocket/handler';
 import dataRoutes from './routes/data';
@@ -39,6 +40,9 @@ startPolling((data) => {
 startNussbaumPolling((data) => {
   broadcastRoomsData(data);
 });
+
+// Start history sampling (reads from PAC + rooms caches every 10 min)
+startHistorySampling();
 
 // Start server
 server.listen(config.server.port, () => {

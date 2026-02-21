@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { HistoryPoint } from '@/types/heatpump'
 import { generateCurvePoints } from '@/lib/heatingCurve'
 
@@ -52,6 +52,8 @@ export function HeatingCurveChart({
   history,
   showSavedCurve,
 }: HeatingCurveChartProps) {
+  const [hoveredPoint, setHoveredPoint] = useState<{ idx: number; x: number; y: number } | null>(null)
+
   const previewPoints = useMemo(
     () => generateCurvePoints(endPoint, parallelOffset, X_MIN, X_MAX),
     [endPoint, parallelOffset],
@@ -135,9 +137,14 @@ export function HeatingCurveChart({
       {history.map((p, i) => {
         const px = scaleX(Math.max(X_MIN, Math.min(X_MAX, p.outdoorTemp)))
         const py = scaleY(Math.max(Y_MIN, Math.min(Y_MAX, p.returnTemp)))
+        const isHovered = hoveredPoint?.idx === i
         return (
-          <circle key={`h${i}`} cx={px} cy={py} r={3}
-            fill="#6366f1" fillOpacity={0.3} stroke="#6366f1" strokeOpacity={0.5} strokeWidth={0.5} />
+          <circle key={`h${i}`} cx={px} cy={py} r={isHovered ? 5 : 3}
+            fill="#6366f1" fillOpacity={isHovered ? 0.7 : 0.3}
+            stroke="#6366f1" strokeOpacity={isHovered ? 1 : 0.5} strokeWidth={isHovered ? 1.5 : 0.5}
+            style={{ cursor: 'pointer' }}
+            onMouseEnter={() => setHoveredPoint({ idx: i, x: px, y: py })}
+            onMouseLeave={() => setHoveredPoint(null)} />
         )
       })}
 
@@ -188,6 +195,39 @@ export function HeatingCurveChart({
           </>
         )}
       </g>
+
+      {/* Tooltip (rendered last to be on top) */}
+      {hoveredPoint && (() => {
+        const p = history[hoveredPoint.idx]
+        if (!p) return null
+        const time = new Date(p.timestamp).toLocaleString('fr-CH', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+        const lines = [
+          time,
+          `Ext: ${p.outdoorTemp.toFixed(1)}°C`,
+          `Retour: ${p.returnTemp.toFixed(1)}°C`,
+          `Consigne: ${p.returnTarget.toFixed(1)}°C`,
+          `Départ: ${p.flowTemp.toFixed(1)}°C`,
+          ...(p.avgRoomTemp != null ? [`Pièces: ${p.avgRoomTemp.toFixed(1)}°C`] : []),
+        ]
+        const tipW = 130
+        const tipH = lines.length * 14 + 10
+        const flipX = hoveredPoint.x + tipW + 15 > W - PAD.right
+        const tx = flipX ? hoveredPoint.x - tipW - 10 : hoveredPoint.x + 10
+        const flipY = hoveredPoint.y - tipH / 2 < PAD.top
+        const ty = flipY ? hoveredPoint.y + 5 : hoveredPoint.y - tipH / 2
+        return (
+          <g pointerEvents="none">
+            <rect x={tx} y={ty} width={tipW} height={tipH} rx={4}
+              fill="white" stroke="#e2e8f0" strokeWidth={1} />
+            {lines.map((line, j) => (
+              <text key={j} x={tx + 7} y={ty + 14 + j * 14}
+                fontSize={10} fill="#0f172a" fontWeight={j === 0 ? 600 : 400}>
+                {line}
+              </text>
+            ))}
+          </g>
+        )
+      })()}
     </svg>
   )
 }
