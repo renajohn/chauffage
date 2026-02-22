@@ -28,12 +28,13 @@ services:
       - backend
     networks:
       - chauffage
-  labels:
+    labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - homepage.group=Apps
-      - homepage.name=Chauffage
+      - homepage.name=Thermostat
+      - homepage.description=PAC géothermique & plancher chauffant
       - homepage.href=http://p-cloud.local:8050
-      - homepage.icon=favicon.svg
+      - homepage.icon=http://p-cloud.local:8050/favicon.svg
 volumes:
   backend-data:
 
