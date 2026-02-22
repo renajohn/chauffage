@@ -28,7 +28,12 @@ services:
       - backend
     networks:
       - chauffage
-
+  labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - homepage.group=Apps
+      - homepage.name=Chauffage
+      - homepage.href=http://p-cloud.local:8050
+      - homepage.icon=favicon.svg
 volumes:
   backend-data:
 
