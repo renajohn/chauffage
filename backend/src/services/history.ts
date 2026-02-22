@@ -44,6 +44,13 @@ function sample(): void {
   const pac = getCachedData();
   if (!pac) return; // PAC not connected yet
 
+  // Only sample when PAC is in floor heating mode (not ECS/hot water)
+  const mode = pac.operatingState.mode;
+  if (mode === 'Eau chaude' || mode === 'Piscine' || mode === 'Dégivrage') {
+    console.log(`[History] Échantillon ignoré (mode: ${mode})`);
+    return;
+  }
+
   const rooms = getCachedRoomsData();
 
   let avgRoomTemp: number | null = null;
