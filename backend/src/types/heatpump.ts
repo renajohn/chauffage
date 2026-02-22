@@ -95,4 +95,7 @@ export const WRITABLE_PARAMS: Record<string, { min: number; max: number; type: s
   warmwater_target_temperature: { min: 30, max: 65, type: 'temperature' },
   heating_operation_mode: { min: 0, max: 4, type: 'mode' },
   warmwater_operation_mode: { min: 0, max: 4, type: 'mode' },
+  heating_curve_end_point: { min: 20, max: 70, type: 'temperature' },
+  heating_curve_parallel_offset: { min: 5, max: 35, type: 'temperature' },
+  deltaHeatingReduction: { min: -15, max: 10, type: 'temperature' },
 };
