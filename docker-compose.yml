@@ -16,27 +16,31 @@ services:
     volumes:
       - backend-data:/app/data
     networks:
-      - chauffage
+      - web
 
   frontend:
     build:
       context: ./frontend
     restart: unless-stopped
-    ports:
-      - "8050:80"
     depends_on:
       - backend
     networks:
-      - chauffage
+      - web
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "traefik.enable=true"
+      - "traefik.http.routers.chauffage.rule=Host(`chauffage.lab.crog.org`)"
+      - "traefik.http.routers.chauffage.entrypoints=websecure"
+      - "traefik.http.routers.chauffage.tls=true"
+      - "traefik.http.services.chauffage.loadbalancer.server.port=80"
       - homepage.group=Apps
       - homepage.name=Thermostat
       - homepage.description=PAC géothermique & plancher chauffant
-      - homepage.href=http://p-cloud.local:8050
-      - homepage.icon=http://p-cloud.local:8050/favicon.svg
+      - homepage.href=https://chauffage.lab.crog.org
+      - homepage.icon=https://chauffage.lab.crog.org/favicon.svg
 volumes:
   backend-data:
 
 networks:
-  chauffage:
+  web:
+    external: true
