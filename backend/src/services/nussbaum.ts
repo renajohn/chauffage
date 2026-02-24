@@ -82,7 +82,7 @@ function saveCache(data: RoomsData): void {
  */
 async function fetchXsrfToken(host: string): Promise<string> {
   const url = `http://${host}/`;
-  const res = await fetch(url, { redirect: 'follow' });
+  const res = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(30_000) });
 
   // Try getSetCookie() first, then fall back to get('set-cookie')
   let cookieStrings: string[] = [];
@@ -125,6 +125,7 @@ async function controllerGet(host: string, path: string): Promise<any> {
       'X-XSRF-TOKEN': token,
       'Cookie': `XSRF-TOKEN=${encodeURIComponent(token)}`,
     },
+    signal: AbortSignal.timeout(30_000),
   });
 
   // If 403, refresh token and retry once
@@ -135,6 +136,7 @@ async function controllerGet(host: string, path: string): Promise<any> {
         'X-XSRF-TOKEN': newToken,
         'Cookie': `XSRF-TOKEN=${encodeURIComponent(newToken)}`,
       },
+      signal: AbortSignal.timeout(30_000),
     });
     if (!retryRes.ok) throw new Error(`HTTP ${retryRes.status} from ${url}`);
     return retryRes.json();
@@ -158,6 +160,7 @@ async function controllerPost(host: string, path: string, body: string, contentT
       'Cookie': `XSRF-TOKEN=${encodeURIComponent(token)}`,
     },
     body,
+    signal: AbortSignal.timeout(30_000),
   });
 
   // If 403, refresh token and retry once
@@ -171,6 +174,7 @@ async function controllerPost(host: string, path: string, body: string, contentT
         'Cookie': `XSRF-TOKEN=${encodeURIComponent(newToken)}`,
       },
       body,
+      signal: AbortSignal.timeout(30_000),
     });
     if (!retryRes.ok) throw new Error(`HTTP ${retryRes.status} from ${url}`);
     const retryText = await retryRes.text();
