@@ -316,6 +316,15 @@ async function pollAll(): Promise<RoomsData> {
         diagnose: 0,
         errors: [String(result.reason)],
       });
+
+      // Keep last known rooms from cache for this controller
+      if (cachedRoomsData) {
+        const staleRooms = cachedRoomsData.rooms.filter((r) => r.controllerId === ctrl.id);
+        if (staleRooms.length > 0) {
+          console.log(`[Nussbaum] ${ctrl.name} hors-ligne, conservation de ${staleRooms.length} pièces du cache`);
+          allRooms.push(...staleRooms);
+        }
+      }
     }
   }
 
