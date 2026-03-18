@@ -122,12 +122,12 @@ export function analyzeAndRecommend(
     const coldBias = Math.abs(coldWeatherDelta) > Math.abs(mildWeatherDelta) + 0.5
     if (coldBias) {
       // Worse in cold weather → increase end point
-      suggestedEndPoint = round1(endPoint - correction) // correction is positive here
+      suggestedEndPoint = round1(endPoint + correction)
       recommendation = `Vos pièces sont en moyenne ${Math.abs(avgRoomDelta).toFixed(1)}°C en dessous de la consigne, surtout par temps froid. On recommande d'augmenter la fin de courbe de ${endPoint.toFixed(0)}→${suggestedEndPoint.toFixed(0)}°C.`
       details = `Écart par temps froid : ${coldWeatherDelta.toFixed(1)}°C, par temps doux : ${mildWeatherDelta.toFixed(1)}°C. L'augmentation de la fin de courbe améliore le chauffage par grand froid.`
     } else {
       // Constant deficit → increase parallel offset
-      suggestedParallelOffset = round1(parallelOffset - correction)
+      suggestedParallelOffset = round1(parallelOffset + correction)
       recommendation = `Vos pièces sont en moyenne ${Math.abs(avgRoomDelta).toFixed(1)}°C en dessous de la consigne. On recommande d'augmenter le pied de courbe de ${parallelOffset.toFixed(0)}→${suggestedParallelOffset.toFixed(0)}°C.`
       details = `Écart constant quelle que soit la température extérieure. Le pied de courbe décale toute la courbe vers le haut.`
     }
@@ -135,11 +135,11 @@ export function analyzeAndRecommend(
     // Too hot
     const hotBias = Math.abs(mildWeatherDelta) > Math.abs(coldWeatherDelta) + 0.5
     if (hotBias) {
-      suggestedParallelOffset = round1(parallelOffset - correction) // correction is negative here
+      suggestedParallelOffset = round1(parallelOffset + correction) // correction is negative here
       recommendation = `Vos pièces sont en moyenne ${avgRoomDelta.toFixed(1)}°C au-dessus de la consigne, surtout par temps doux. On recommande de baisser le pied de courbe de ${parallelOffset.toFixed(0)}→${suggestedParallelOffset.toFixed(0)}°C.`
       details = `Surchauffe plus prononcée par temps doux. Le pied de courbe réduit la température en mi-saison.`
     } else {
-      suggestedEndPoint = round1(endPoint - correction)
+      suggestedEndPoint = round1(endPoint + correction)
       recommendation = `Vos pièces sont en moyenne ${avgRoomDelta.toFixed(1)}°C au-dessus de la consigne. On recommande de baisser la fin de courbe de ${endPoint.toFixed(0)}→${suggestedEndPoint.toFixed(0)}°C.`
       details = `Surchauffe globale. La fin de courbe réduit la puissance par temps froid.`
     }
