@@ -1,0 +1,276 @@
+# Tableau de bord « PAC » — pompe à chaleur géothermique Alpha Innotec.
+#
+# SOURCE DE VÉRITÉ : dépôt chauffage, ha/dashboards/pac.yaml, déployé par
+# deploy/deploy-ha.sh. Ne pas éditer sur p-cloud.
+#
+# Déclaré dans configuration.yaml sous lovelace.dashboards.pac-chauffage. Le
+# chemin DOIT contenir un tiret, sinon la validation refuse le bloc (règle de
+# lovelace/const.py, déjà notée dans configuration.yaml). Le contenu est relu
+# à chaque actualisation de la page ; seule sa déclaration exige un
+# redémarrage.
+#
+# max_columns: 4 — la vue est centrée avec max-width = colonnes × 500 px. À 2
+# elle plafonnerait à 1032 px quel que soit l'écran (vérifié au DOM le
+# 21.09.2026).
+#
+# grid_options: {columns: full} sur les cartes posées en section : sans lui
+# une carte n'occupe qu'une partie de la grille interne (une carte grid
+# mesurait 436 px dans une section de 880).
+#
+# check_config NE VALIDE PAS ce fichier. Vérifier le YAML et le rendu
+# séparément.
+
+title: PAC
+views:
+  - title: PAC
+    path: pac
+    icon: mdi:heat-pump
+    type: sections
+    max_columns: 4
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: En ce moment
+            heading_style: title
+            icon: mdi:heat-pump
+          - type: markdown
+            grid_options:
+              columns: full
+            content: |-
+              ## {{ states('sensor.pac_etat') }}
+
+              *depuis {{ states('sensor.pac_depuis') }}*
+
+
+              {{ states('sensor.pac_explication') }}
+
+      - type: grid
+        # column_span: 2 — le schéma est dessiné en 800×400 et ses repères ont
+        # été vérifiés au calque à cette taille. Dans une colonne (372 px au
+        # DOM le 22.09.2026) l'image tombe à 46 % tandis que les étiquettes
+        # restent en pixels d'écran : une étiquette mesurait 61 px pour un
+        # cercle de compresseur de 31 px, et les valeurs se chevauchaient. Sur
+        # deux colonnes l'image revient à ~93 % et les repères retrouvent leur
+        # sens.
+        column_span: 2
+        cards:
+          - type: heading
+            heading: Le circuit
+            heading_style: title
+            icon: mdi:pipe
+          - type: picture-elements
+            grid_options:
+              columns: full
+            image: /local/pac-circuit.svg
+            elements:
+              # Températures, posées où se trouve leur sonde. Les repères en
+              # pourcentage sont ceux notés en tête de la tâche 6 du plan.
+              #
+              # Pastille sombre sous chaque valeur. Le SVG n'a pas de fond :
+              # en thème clair, le blanc des étiquettes tombait sur le blanc
+              # de la carte et la température extérieure, le départ et le
+              # retour disparaissaient purement et simplement (constaté au
+              # rendu le 22.09.2026). La pastille rend le texte lisible quel
+              # que soit ce qu'il y a dessous, et se fond dans le bloc de la
+              # PAC, qui est déjà de cette teinte.
+              - type: state-label
+                entity: sensor.pac_temperature_du_sol
+                style: {top: 70%, left: 27%, color: white, font-size: 14px, background: "rgba(15,23,42,0.78)", padding: 1px 6px, border-radius: 6px, white-space: nowrap}
+              - type: state-label
+                entity: sensor.luxtronik_300722_07_heat_source_output_temperature
+                style: {top: 90%, left: 27%, color: white, font-size: 14px, background: "rgba(15,23,42,0.78)", padding: 1px 6px, border-radius: 6px, white-space: nowrap}
+              - type: state-label
+                entity: sensor.luxtronik_300722_07_hot_gas_temperature
+                style: {top: 62%, left: 50%, color: white, font-size: 14px, background: "rgba(15,23,42,0.78)", padding: 1px 6px, border-radius: 6px, white-space: nowrap}
+              - type: state-label
+                entity: sensor.luxtronik_300722_07_flow_in_temperature
+                style: {top: 38%, left: 68%, color: white, font-size: 14px, background: "rgba(15,23,42,0.78)", padding: 1px 6px, border-radius: 6px, white-space: nowrap}
+              - type: state-label
+                entity: sensor.luxtronik_300722_07_flow_out_temperature
+                style: {top: 70%, left: 68%, color: white, font-size: 14px, background: "rgba(15,23,42,0.78)", padding: 1px 6px, border-radius: 6px, white-space: nowrap}
+              - type: state-label
+                entity: sensor.luxtronik_300722_07_dhw_temperature
+                style: {top: 22%, left: 90%, color: white, font-size: 14px, background: "rgba(15,23,42,0.78)", padding: 1px 6px, border-radius: 6px, white-space: nowrap}
+              - type: state-label
+                entity: sensor.luxtronik_300722_07_outdoor_temperature
+                style: {top: 8%, left: 12%, color: white, font-size: 14px, background: "rgba(15,23,42,0.78)", padding: 1px 6px, border-radius: 6px, white-space: nowrap}
+              # Organes, allumés ou éteints. Le compresseur garde le repère
+              # 50/50 du contrat, entre le titre et le cercle.
+              #
+              # Les deux pompes ont été déplacées après lecture du rendu le
+              # 22.09.2026 : à 63/42 la pompe de circulation tombait sur
+              # l'angle du bloc de la PAC, à moitié cachée sous l'étiquette du
+              # départ, et à 78/26 la pompe de charge se posait sur la pointe
+              # de la flèche qui entre dans le ballon. Elles sont maintenant
+              # sur la colonne x=600 (left 75 %), chacune sur la branche
+              # qu'elle pousse : la pompe de charge au-dessus de la
+              # dérivation, sur la branche qui monte au ballon ; la pompe de
+              # circulation en dessous, sur celle qui descend au plancher.
+              # C'est libre de tout trait et cela se lit sans légende.
+              - type: state-icon
+                entity: binary_sensor.luxtronik_300722_07_compressor
+                title: Compresseur
+                style: {top: 50%, left: 50%}
+              - type: state-icon
+                entity: binary_sensor.luxtronik_300722_07_dhw_charging_pump
+                title: Pompe de charge du ballon
+                style: {top: 33%, left: 75%}
+              - type: state-icon
+                entity: binary_sensor.luxtronik_300722_07_pump_flow
+                title: Pompe de circulation
+                style: {top: 55%, left: 75%}
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Est-ce que ça va bien
+            heading_style: title
+            icon: mdi:stethoscope
+          - type: markdown
+            grid_options:
+              columns: full
+            # Chaque indicateur dit sa valeur ET son verdict, ou pourquoi il se
+            # tait. Les deux écarts ne veulent rien dire compresseur à
+            # l'arrêt : l'eau stagne et les sondes s'équilibrent.
+            content: |-
+              {% macro ligne(nom, eid, unite, muet) %}
+              **{{ nom }}** — {% if has_value(eid) %}{{ states(eid) }} {{ unite }} · {{ state_attr(eid, 'verdict') }}{% else %}{{ muet }}{% endif %}
+              {% endmacro %}
+
+              {{ ligne('Écart chauffage', 'sensor.pac_ecart_chauffage', 'K', 'non mesurable, le compresseur est à l\'arrêt') }}
+
+              {{ ligne('Écart source', 'sensor.pac_ecart_source', 'K', 'non mesurable, le compresseur est à l\'arrêt') }}
+
+              {{ ligne('Température du sol', 'sensor.pac_temperature_du_sol', '°C', 'sonde indisponible') }}
+
+              {{ ligne('Rendement eau chaude', 'sensor.pac_rendement_eau_chaude', '', 'pas encore de chauffe mesurée') }}
+
+              {{ ligne('Rendement chauffage', 'sensor.pac_rendement_chauffage', '', 'la PAC n\'a pas encore chauffé la maison depuis la remise à zéro des compteurs') }}
+
+              {{ ligne('Rendement instantané', 'sensor.pac_rendement_instantane', '', 'le compresseur est à l\'arrêt') }}
+
+              {{ ligne('Cycle moyen', 'sensor.pac_cycle_moyen', 'min', 'pas assez de démarrages pour se prononcer') }}
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: La courbe de chauffe
+            heading_style: title
+            icon: mdi:chart-bell-curve-cumulative
+          - type: markdown
+            grid_options:
+              columns: full
+            # Seul le circuit 2 est réel : les circuits 1 et 3 lisent 75 °C,
+            # valeur sentinelle de sonde absente (vérifié le 22.09.2026).
+            #
+            # UNE PHRASE, UNE LIGNE. ha-markdown rend un simple retour à la
+            # ligne comme un <br> : replier la phrase dans le YAML la coupait
+            # à l'écran au milieu, « … la PAC vise 35.0 °C / au retour ; … »
+            # (constaté au rendu le 22.09.2026). Les lignes sont longues, la
+            # phrase est entière.
+            content: |-
+              À −15 °C dehors la PAC vise **{{ states('number.luxtronik_300722_07_heating_curve_circuit2_end_temperature') }} °C** au retour ; à +20 °C, **{{ states('number.luxtronik_300722_07_heating_curve_circuit2_parallel_shift_temperature') }} °C**. Abaissement de nuit : {{ states('number.luxtronik_300722_07_heating_curve_circuit2_night_temperature') }} K.
+
+
+              En ce moment, dehors {{ states('sensor.luxtronik_300722_07_outdoor_temperature') }} °C, consigne de retour **{{ states('sensor.luxtronik_300722_07_flow_out_temperature_target') }} °C**, retour réel {{ states('sensor.luxtronik_300722_07_flow_out_temperature') }} °C.
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: L'historique
+            heading_style: title
+            icon: mdi:chart-line
+          - type: history-graph
+            grid_options:
+              columns: full
+            hours_to_show: 48
+            entities:
+              - entity: sensor.luxtronik_300722_07_outdoor_temperature
+                name: Dehors
+              - entity: sensor.luxtronik_300722_07_flow_in_temperature
+                name: Départ
+              - entity: sensor.luxtronik_300722_07_flow_out_temperature
+                name: Retour
+              - entity: sensor.pac_temperature_du_sol
+                name: Sol
+              - entity: sensor.luxtronik_300722_07_dhw_temperature
+                name: Ballon
+          - type: statistics-graph
+            grid_options:
+              columns: full
+            title: Heures et énergie, par jour
+            days_to_show: 30
+            period: day
+            stat_types:
+              - state
+            entities:
+              - entity: sensor.luxtronik_300722_07_compressor1_operation_hours
+                name: Heures de compresseur
+              - entity: sensor.luxtronik_300722_07_dhw_heat_amount
+                name: Chaleur pour le ballon
+              - entity: sensor.luxtronik_300722_07_dhw_energy_input
+                name: Électricité pour le ballon
+
+      - type: grid
+        cards:
+          - type: heading
+            heading: Le détail
+            heading_style: title
+            icon: mdi:magnify
+          - type: entities
+            grid_options:
+              columns: full
+            title: Températures
+            entities:
+              - entity: sensor.luxtronik_300722_07_outdoor_temperature
+                name: Extérieure (TA)
+              - entity: sensor.luxtronik_300722_07_outdoor_temperature_average
+                name: Moyenne 24 h
+              - entity: sensor.luxtronik_300722_07_flow_in_temperature
+                name: Départ chauffage (TVL)
+              - entity: sensor.luxtronik_300722_07_flow_out_temperature
+                name: Retour chauffage (TRL)
+              - entity: sensor.luxtronik_300722_07_flow_out_temperature_target
+                name: Consigne de retour
+              - entity: sensor.luxtronik_300722_07_dhw_temperature
+                name: Ballon (TBW)
+              - entity: sensor.luxtronik_300722_07_heat_source_input_temperature
+                name: Saumure du sol (TEE)
+              - entity: sensor.luxtronik_300722_07_heat_source_output_temperature
+                name: Saumure vers le sol (TAE)
+              - entity: sensor.luxtronik_300722_07_hot_gas_temperature
+                name: Gaz chaud (THG)
+          - type: entities
+            grid_options:
+              columns: full
+            title: Compteurs
+            entities:
+              - entity: sensor.luxtronik_300722_07_compressor1_operation_hours
+                name: Heures de compresseur
+              - entity: sensor.luxtronik_300722_07_compressor1_impulses
+                name: Démarrages
+              - entity: sensor.luxtronik_300722_07_dhw_heat_amount
+                name: Chaleur produite pour le ballon
+              - entity: sensor.luxtronik_300722_07_dhw_energy_input
+                name: Électricité pour le ballon
+              - entity: sensor.luxtronik_300722_07_heat_amount_heating
+                name: Chaleur produite pour le chauffage
+          - type: markdown
+            grid_options:
+              columns: full
+            # Les pressions sont affichées, JAMAIS interprétées. Relevé du
+            # 22.09.2026 : haute 14,57 bar, basse 15,10 — la basse au-dessus de
+            # la haute. Elles s'équilibrent circuit arrêté et les décalages de
+            # sonde ressortent.
+            #
+            # error_reason est la DERNIÈRE erreur mémorisée, pas une erreur
+            # active : il vaut 721 en permanence alors que la PAC va bien.
+            # L'état de panne, c'est disturbance_output.
+            #
+            # Une phrase, une ligne : voir la carte de la courbe de chauffe.
+            content: |-
+              **Pressions** — haute {{ states('sensor.luxtronik_300722_07_high_pressure') }} bar, basse {{ states('sensor.luxtronik_300722_07_low_pressure') }} bar. Elles s'équilibrent à l'arrêt : ne pas les lire comme un indicateur de santé.
+
+
+              **Défaut en cours** — {{ 'oui' if is_state('binary_sensor.luxtronik_300722_07_disturbance_output', 'on') else 'aucun' }}. Dernière erreur mémorisée : code {{ states('sensor.luxtronik_300722_07_error_reason') }}.
