@@ -164,7 +164,7 @@ template:
           # 8 K, le débit est trop faible.
           verdict: >-
             {% set d = (states('sensor.luxtronik_300722_07_flow_in_temperature') | float(0)
-                        - states('sensor.luxtronik_300722_07_flow_out_temperature') | float(0)) %}
+                        - states('sensor.luxtronik_300722_07_flow_out_temperature') | float(0)) | round(1) %}
             {% if d < 2 %}Très faible : la circulation est rapide, ou la PAC module à vide.
             {% elif d <= 7 %}Normal pour un plancher chauffant.
             {% elif d <= 8 %}Un peu élevé : le débit commence à manquer.
@@ -187,7 +187,7 @@ template:
           # faiblit, soit le terrain ne rend plus assez.
           verdict: >-
             {% set d = (states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0)
-                        - states('sensor.luxtronik_300722_07_heat_source_output_temperature') | float(0)) %}
+                        - states('sensor.luxtronik_300722_07_heat_source_output_temperature') | float(0)) | round(1) %}
             {% if d < 2 %}Faible : on prend peu de chaleur au terrain.
             {% elif d <= 5 %}Normal : le terrain rend bien.
             {% elif d <= 6 %}Un peu élevé : à surveiller.
@@ -212,7 +212,7 @@ template:
           # verdict-là reste valable à l'arrêt : c'est une température, pas un
           # écart.
           verdict: >-
-            {% set t = states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0) %}
+            {% set t = states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0) | round(1) %}
             {% if t < -5 %}Très froid : le terrain est sollicité au-delà de sa plage habituelle.
             {% elif t < 0 %}Froid, mais dans la plage d'une fin d'hiver.
             {% elif t < 15 %}Normal pour un terrain en saison de chauffe.
