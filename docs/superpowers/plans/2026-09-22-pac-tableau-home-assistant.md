@@ -1381,7 +1381,47 @@ Les remplacer par :
              sensor_card(LUX + "flow_out_temperature", "Retour", "mdi:arrow-left-bold", "blue"),
 ```
 
-- [ ] **Step 5: Corriger le chemin annoncé dans l'en-tête**
+- [ ] **Step 5: Retirer la mention « Compresseur à l'arrêt »**
+
+Toujours dans l'entrée `pac` de `TECHNIQUE`, la carte de chips affiche en
+permanence l'état du compresseur — « Compresseur » en marche, « Compresseur à
+l'arrêt » le reste du temps. Or il est à l'arrêt l'essentiel de l'année, et le
+tableau PAC porte désormais cette information. La puce ne doit apparaître que
+quand le compresseur tourne.
+
+Remplacer :
+
+```python
+                 {"type": "template", "entity": "binary_sensor.luxtronik_300722_07_compressor", "icon": "mdi:engine",
+                  "icon_color": t("'blue' if is_state('binary_sensor.luxtronik_300722_07_compressor', 'on') else 'grey'"),
+                  "content": t("'Compresseur' if is_state('binary_sensor.luxtronik_300722_07_compressor', 'on') else 'Compresseur à l\\'arrêt'")}]},
+```
+
+par :
+
+```python
+                 # La puce ne s'affiche QUE compresseur en marche : a l'arret
+                 # elle ne disait rien d'utile, et l'etat complet vit
+                 # desormais dans le tableau PAC (/pac-chauffage/pac).
+                 {"type": "conditional",
+                  "conditions": [{"condition": "state",
+                                  "entity": "binary_sensor.luxtronik_300722_07_compressor",
+                                  "state": "on"}],
+                  "chip": {"type": "template",
+                           "entity": "binary_sensor.luxtronik_300722_07_compressor",
+                           "icon": "mdi:engine", "icon_color": "blue",
+                           "content": "Compresseur"}}]},
+```
+
+La forme `conditional` avec une clé `chip` est celle qu'emploient déjà les
+chips de `overview()` (voir la puce conditionnée par `CHAUD`).
+
+**Attention à l'échappement.** La ligne remplacée contient `\\'` dans le source
+Python. Repérer la ligne par `grep -n "Compresseur" gen_maison.py` et l'éditer
+sur place plutôt que de coller un bloc, pour ne pas se tromper de niveau
+d'échappement.
+
+- [ ] **Step 6: Corriger le chemin annoncé dans l'en-tête**
 
 Dans `HEADER`, remplacer :
 
@@ -1398,7 +1438,7 @@ par :
 
 Le chemin annoncé était d'un niveau trop haut.
 
-- [ ] **Step 6: Régénérer et vérifier que les changements sont là, et seulement eux**
+- [ ] **Step 7: Régénérer et vérifier que les changements sont là, et seulement eux**
 
 ```bash
 ssh p-cloud "cd /home/rjl/homelab/homeassistant/config/homelab
@@ -1407,9 +1447,9 @@ ssh p-cloud "cd /home/rjl/homelab/homeassistant/config/homelab
   diff ../dashboards/maison.yaml maison.yaml | head -40"
 ```
 
-Attendu : uniquement les lignes des deux nouvelles cartes, l'échange des étiquettes Départ/Retour, et la ligne de l'en-tête. Aucune autre section touchée.
+Attendu : uniquement les lignes des deux nouvelles cartes, l'échange des étiquettes Départ/Retour, le passage de la puce du compresseur en `conditional`, et la ligne de l'en-tête. Aucune autre section touchée.
 
-- [ ] **Step 7: Déployer le tableau régénéré**
+- [ ] **Step 8: Déployer le tableau régénéré**
 
 ```bash
 ssh p-cloud "cd /home/rjl/homelab/homeassistant/config/homelab
@@ -1421,7 +1461,7 @@ ssh p-cloud "cd /home/rjl/homelab/homeassistant/config/homelab
 
 Attendu : `deploye`. Le tableau « Maison » est relu à chaque actualisation de la page : pas de redémarrage.
 
-- [ ] **Step 8: Commit d'une copie du script dans ce dépôt, pour trace**
+- [ ] **Step 9: Commit d'une copie du script dans ce dépôt, pour trace**
 
 Le script vit sur p-cloud et n'est pas versionné ici. En garder la version modifiée permet de retrouver ce qui a été changé :
 
@@ -1475,7 +1515,7 @@ Redimensionner la fenêtre à 390 px de large et recapturer. Vérifier qu'aucun 
 
 Ouvrir `https://ha.lab.crog.org/maison-pieces/maison`, trouver la tuile « PAC » dans « Actions », vérifier que son sous-texte affiche l'état vivant, cliquer, et confirmer l'arrivée sur le tableau PAC. Recommencer depuis `https://ha.lab.crog.org/maison-pieces/technique`.
 
-Vérifier au passage que « Départ » y affiche maintenant la valeur la plus **haute** des deux (24,0 contre 23,5).
+Vérifier au passage deux choses sur la vue Technique : que « Départ » affiche maintenant la valeur la plus **haute** des deux (24,0 contre 23,5), et qu'**aucune puce « Compresseur à l'arrêt » ne subsiste** — compresseur arrêté, la puce doit avoir disparu.
 
 - [ ] **Step 5: Consigner ce qui reste à vérifier à la première chauffe**
 
