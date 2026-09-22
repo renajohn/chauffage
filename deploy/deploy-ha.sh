@@ -52,6 +52,7 @@ if [ -f ha/www/pac-circuit.svg ]; then
   scp -q ha/www/pac-circuit.svg "$HOST:/tmp/pac-circuit.svg"
   COPIES="$COPIES
 docker cp -q /tmp/pac-circuit.svg homeassistant:/config/www/pac-circuit.svg"
+  SAUVES="$SAUVES www/pac-circuit.svg"
 fi
 
 # Remet les fichiers dans l'état d'avant le déploiement, et dit lesquels.
