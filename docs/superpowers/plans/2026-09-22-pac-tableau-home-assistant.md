@@ -34,6 +34,15 @@
   défaut.
 - **Les fichiers ne sont jamais édités sur p-cloud.** Source de vérité : ce dépôt. Déploiement par `deploy/deploy-ha.sh`.
 - **Sens des sondes, établi le 22.09.2026 :** `flow_in_temperature` = **départ** (Vorlauf), `flow_out_temperature` = **retour** (Rücklauf). Preuve : `flow_out_temperature_target` vaut 15,0 et correspond exactement à `temperature_target_return` lu en direct sur la PAC, or la régulation Alpha Innotec pilote sur le retour. Confirmé par la lecture directe : `temperature_supply` 24,0 = `flow_in`, `temperature_return` 23,5 = `flow_out`.
+- **La production d'eau chaude se détecte sur `sensor.…status == 'hot_water'`, jamais sur la
+  seule pompe de charge.** Relevé le 22.09.2026 à 11 h 30, compresseur en marche et ballon en
+  charge : `status` valait `hot_water` pendant que `binary_sensor.…dhw_charging_pump` valait
+  **`off`**. Une cascade qui se fie à cette pompe annonce « Chauffe la maison » pendant une
+  charge du ballon, et la phrase de causalité affirme alors que le compresseur comble un écart
+  alors que le retour est 31 K au-dessus de sa consigne. La pompe reste en second terme d'un
+  `or`, elle ne coûte rien.
+- **Valeurs de `status` observées à ce jour :** `no_request` et `hot_water`. `heating` et
+  `cooling` restent non observées.
 - **État de panne :** `binary_sensor.…disturbance_output`, jamais `sensor.…error_reason`. Ce dernier vaut 721 sans discontinuer depuis au moins 5 jours alors que la PAC va bien : c'est la **dernière** erreur mémorisée, pas une erreur active.
 - **Hôte :** p-cloud, conteneur `homeassistant`, configuration dans `/home/rjl/homelab/homeassistant/config` (montée sur `/config`).
 - **API Home Assistant :** `https://ha.lab.crog.org`, jeton dans la variable d'environnement `$HA`.
@@ -287,7 +296,7 @@ Créer `/tmp/t-etat.j2` avec exactement le corps du futur `state:` :
 {% elif is_state('binary_sensor.' ~ lux ~ 'disturbance_output', 'on') %}Erreur
 {% elif is_state('binary_sensor.' ~ lux ~ 'defrost_valve', 'on') %}Dégivre
 {% elif is_state('binary_sensor.' ~ lux ~ 'evu_unlocked', 'off') %}Bloquée par le réseau
-{% elif is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}Fait l'eau chaude
+{% elif statut == 'hot_water' or is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}Fait l'eau chaude
 {% elif statut == 'cooling' %}Rafraîchit
 {% elif is_state('binary_sensor.' ~ lux ~ 'compressor', 'on') %}Chauffe la maison
 {% elif statut == 'no_request' %}Au-dessus de la limite de chauffe
@@ -369,7 +378,7 @@ template:
           {% if not has_value('sensor.' ~ lux ~ 'status') %}mdi:lan-disconnect
           {% elif is_state('binary_sensor.' ~ lux ~ 'disturbance_output', 'on') %}mdi:alert-circle
           {% elif is_state('binary_sensor.' ~ lux ~ 'defrost_valve', 'on') %}mdi:snowflake-melt
-          {% elif is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}mdi:water-boiler
+          {% elif statut == 'hot_water' or is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}mdi:water-boiler
           {% elif is_state('binary_sensor.' ~ lux ~ 'compressor', 'on') %}mdi:heat-wave
           {% else %}mdi:sleep{% endif %}
         # ÉTAT DE PANNE : disturbance_output, jamais error_reason. Ce dernier
@@ -392,7 +401,7 @@ template:
           {% elif is_state('binary_sensor.' ~ lux ~ 'disturbance_output', 'on') %}Erreur
           {% elif is_state('binary_sensor.' ~ lux ~ 'defrost_valve', 'on') %}Dégivre
           {% elif is_state('binary_sensor.' ~ lux ~ 'evu_unlocked', 'off') %}Bloquée par le réseau
-          {% elif is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}Fait l'eau chaude
+          {% elif statut == 'hot_water' or is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}Fait l'eau chaude
           {% elif statut == 'cooling' %}Rafraîchit
           {% elif is_state('binary_sensor.' ~ lux ~ 'compressor', 'on') %}Chauffe la maison
           {% elif statut == 'no_request' %}Au-dessus de la limite de chauffe

@@ -114,7 +114,7 @@ Un fichier par projet sous `packages/`, selon la convention posée dans
 | État rendu | Condition |
 |---|---|
 | Chauffe la maison | compresseur en marche, statut `heating` |
-| Fait l'eau chaude | compresseur en marche, pompe de charge ECS active |
+| Fait l'eau chaude | `status` vaut `hot_water`, ou la pompe de charge ECS est active |
 | Rafraîchit | mode rafraîchissement actif |
 | Dégivre | vanne de dégivrage ouverte |
 | Bloquée par le réseau | `evu_unlocked` à `off` |
@@ -122,6 +122,10 @@ Un fichier par projet sous `packages/`, selon la convention posée dans
 | Au repos | compresseur à l'arrêt, aucune des conditions ci-dessus |
 | Erreur | `error_reason` non nul |
 | Hors ligne | entités indisponibles |
+
+**La pompe de charge ECS n'est pas un détecteur fiable.** Relevé le 22 septembre à 11 h 30,
+compresseur en marche et ballon en charge : `status` valait `hot_water` pendant que
+`binary_sensor.…dhw_charging_pump` valait `off`. C'est `status` qui fait foi.
 
 L'état « au-dessus de la limite de chauffe » mérite d'exister à part. La PAC l'annonce
 elle-même — lecture directe du 22 septembre : `Heizgrenze (Soll 15 °C)` — et c'est la
