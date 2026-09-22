@@ -12,7 +12,14 @@
 
 ## Global Constraints
 
-- **Préfixe des entités créées :** `sensor.pac_*` et `binary_sensor.pac_*`. `unique_id` identique au nom d'entité sans le domaine.
+- **Préfixe des entités créées :** `sensor.pac_*` et `binary_sensor.pac_*`.
+- **L'identifiant d'entité vient du `name` slugifié, jamais de l'`unique_id`** — constaté en
+  Home Assistant 2026.9.3 le 22.09.2026. `name: "PAC température du sol"` donne
+  `sensor.pac_temperature_du_sol` ; l'`unique_id` ne fait qu'ancrer l'entité dans le registre
+  pour qu'on puisse la renommer ensuite. La clé `object_id`, qui forcerait l'identifiant, est
+  refusée par le domaine `template`. **Conséquence tenue partout : on écrit le libellé français
+  qu'on veut lire, et l'identifiant est son slug.** L'`unique_id` reprend ce même slug. Ne jamais
+  raccourcir un libellé pour obtenir un identifiant : c'est le libellé que l'utilisateur lit.
 - **Tout gabarit lit les états avec un défaut** — `float(0)`, `int(0)`, `has_value()`. Règle maison, énoncée en tête de `gen_maison.py` : rien ne doit planter au démarrage quand une entité est encore indisponible.
 - **`relative_time()` rend l'anglais** et jure dans une interface française. Toute durée est formatée à la main, sur le modèle de `duree_fr()` dans `gen_maison.py`.
 - **Jamais d'identité codée en dur.** Les tableaux sont partagés entre les comptes Renault et Violaine.
@@ -40,7 +47,7 @@ Cette tâche livre la chaîne complète de bout en bout avec un seul capteur tri
 
 **Interfaces:**
 - Consumes: rien.
-- Produces: `deploy/deploy-ha.sh` (déploie `ha/packages/pac.yaml` et, dès qu'il existe, `ha/dashboards/pac.yaml` et `ha/www/pac-circuit.svg`) ; `deploy/render-template.sh <fichier>` (rend un gabarit Jinja par l'API et écrit le résultat sur la sortie standard) ; l'entité `sensor.pac_temperature_sol`.
+- Produces: `deploy/deploy-ha.sh` (déploie `ha/packages/pac.yaml` et, dès qu'il existe, `ha/dashboards/pac.yaml` et `ha/www/pac-circuit.svg`) ; `deploy/render-template.sh <fichier>` (rend un gabarit Jinja par l'API et écrit le résultat sur la sortie standard) ; l'entité `sensor.pac_temperature_du_sol`.
 
 - [ ] **Step 1: Écrire le test — le gabarit du premier capteur**
 
@@ -126,7 +133,7 @@ Attendu : `23.9` (ou la valeur du moment, un nombre à une décimale — pas une
 template:
   - sensor:
       - name: "PAC température du sol"
-        unique_id: pac_temperature_sol
+        unique_id: pac_temperature_du_sol
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -238,7 +245,7 @@ Attendu : la ligne `== check_config`, puis `Testing configuration at /config` sa
 curl -s -X POST -H "Authorization: Bearer $HA" \
   https://ha.lab.crog.org/api/services/homeassistant/reload_all
 curl -s -H "Authorization: Bearer $HA" \
-  https://ha.lab.crog.org/api/states/sensor.pac_temperature_sol
+  https://ha.lab.crog.org/api/states/sensor.pac_temperature_du_sol
 ```
 
 Attendu : un JSON dont `state` est la température du sol (≈ 23.9), `unit_of_measurement` vaut `°C`, et **pas** `unknown` ni `unavailable`.
@@ -297,14 +304,14 @@ et l'ajouter à la chaîne plutôt que de la laisser tomber dans le cas par déf
 Créer `/tmp/t-depuis.j2` :
 
 ```jinja
-{% set d = (as_timestamp(now()) - as_timestamp(states.sensor.pac_temperature_sol.last_changed, as_timestamp(now()))) | int %}
+{% set d = (as_timestamp(now()) - as_timestamp(states.sensor.pac_temperature_du_sol.last_changed, as_timestamp(now()))) | int %}
 {% if d < 60 %}moins d'une minute
 {% elif d < 5400 %}{{ (d / 60) | round(0) | int }} min
 {% elif d < 172800 %}{{ (d / 3600) | round(0) | int }} h
 {% else %}{{ (d / 86400) | round(0) | int }} j{% endif %}
 ```
 
-Ce gabarit vise `sensor.pac_temperature_sol` — qui existe depuis la tâche 1 — pour être testable avant que `sensor.pac_etat` n'existe.
+Ce gabarit vise `sensor.pac_temperature_du_sol` — qui existe depuis la tâche 1 — pour être testable avant que `sensor.pac_etat` n'existe.
 
 - [ ] **Step 4: Lancer le test de durée**
 
@@ -385,7 +392,7 @@ template:
           {% else %}Au repos{% endif %}
 
       - name: "PAC température du sol"
-        unique_id: pac_temperature_sol
+        unique_id: pac_temperature_du_sol
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
@@ -653,13 +660,13 @@ Toujours dans `ha/packages/pac.yaml`, au capteur `PAC température du sol` exist
 deploy/deploy-ha.sh && curl -s -X POST -H "Authorization: Bearer $HA" \
   https://ha.lab.crog.org/api/services/homeassistant/reload_all
 sleep 3
-for e in sensor.pac_ecart_chauffage sensor.pac_ecart_source sensor.pac_temperature_sol; do
+for e in sensor.pac_ecart_chauffage sensor.pac_ecart_source sensor.pac_temperature_du_sol; do
   curl -s -H "Authorization: Bearer $HA" "https://ha.lab.crog.org/api/states/$e" \
     | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["entity_id"], "->", d["state"], "|", d["attributes"].get("verdict","(pas de verdict)"))'
 done
 ```
 
-Attendu, compresseur à l'arrêt : les deux écarts à `unavailable`, et `sensor.pac_temperature_sol` à ≈ 23.9 avec le verdict « Tiède : le terrain s'est rechargé, typique de l'été. »
+Attendu, compresseur à l'arrêt : les deux écarts à `unavailable`, et `sensor.pac_temperature_du_sol` à ≈ 23.9 avec le verdict « Tiède : le terrain s'est rechargé, typique de l'été. »
 
 C'est le résultat recherché : **`unavailable` est le succès de cette tâche**, pas son échec.
 
@@ -679,7 +686,7 @@ git commit -m "Measure both temperature spreads, and silence them at rest"
 
 **Interfaces:**
 - Consumes: rien des tâches précédentes.
-- Produces: `sensor.pac_cop_ecs`, `sensor.pac_cop_chauffage`, `sensor.pac_cop_instant`, `sensor.pac_cycle_moyen` — chacun avec un attribut `verdict`.
+- Produces: `sensor.pac_rendement_eau_chaude`, `sensor.pac_rendement_chauffage`, `sensor.pac_rendement_instantane`, `sensor.pac_cycle_moyen` — chacun avec un attribut `verdict`.
 
 - [ ] **Step 1: Écrire le test des quatre calculs**
 
@@ -735,7 +742,7 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC écart source
       # de cycle » relevée les 20 et 21.09.2026 et consignée en tête de
       # packages/ecs_solaire.yaml. Deux sources indépendantes qui concordent.
       - name: "PAC rendement eau chaude"
-        unique_id: pac_cop_ecs
+        unique_id: pac_rendement_eau_chaude
         state_class: measurement
         icon: mdi:water-boiler
         availability: >-
@@ -758,7 +765,7 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC écart source
       # incohérent : celui-là n'a pas été remis à zéro avec les autres.
       # Annoncer un rendement de 0 serait un mensonge, d'où l'availability.
       - name: "PAC rendement chauffage"
-        unique_id: pac_cop_chauffage
+        unique_id: pac_rendement_chauffage
         state_class: measurement
         icon: mdi:radiator
         availability: >-
@@ -781,7 +788,7 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC écart source
       # Rien ne prouve encore qu'ils renvoient de vraies valeurs en marche.
       # À confirmer à la première chauffe.
       - name: "PAC rendement instantané"
-        unique_id: pac_cop_instant
+        unique_id: pac_rendement_instantane
         state_class: measurement
         icon: mdi:speedometer
         availability: >-
@@ -826,13 +833,13 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC écart source
 deploy/deploy-ha.sh && curl -s -X POST -H "Authorization: Bearer $HA" \
   https://ha.lab.crog.org/api/services/homeassistant/reload_all
 sleep 3
-for e in sensor.pac_cop_ecs sensor.pac_cop_chauffage sensor.pac_cop_instant sensor.pac_cycle_moyen; do
+for e in sensor.pac_rendement_eau_chaude sensor.pac_rendement_chauffage sensor.pac_rendement_instantane sensor.pac_cycle_moyen; do
   curl -s -H "Authorization: Bearer $HA" "https://ha.lab.crog.org/api/states/$e" \
     | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["entity_id"], "->", d["state"], "|", d["attributes"].get("verdict",""))'
 done
 ```
 
-Attendu : `sensor.pac_cop_ecs -> 3.64 | Correct : chauffer à 54 °C coûte toujours plus que chauffer un plancher.` et les trois autres à `unavailable`.
+Attendu : `sensor.pac_rendement_eau_chaude -> 3.64 | Correct : chauffer à 54 °C coûte toujours plus que chauffer un plancher.` et les trois autres à `unavailable`.
 
 - [ ] **Step 5: Commit**
 
@@ -962,7 +969,7 @@ git commit -m "Draw the geothermal circuit as the dashboard's backdrop"
 - Modify: `configuration.yaml` sur p-cloud (une entrée sous `lovelace.dashboards`)
 
 **Interfaces:**
-- Consumes: `sensor.pac_etat`, `sensor.pac_depuis`, `sensor.pac_explication` (tâches 2 et 3) ; `sensor.pac_ecart_chauffage`, `sensor.pac_ecart_source`, `sensor.pac_temperature_sol` (tâche 4) ; `sensor.pac_cop_ecs`, `sensor.pac_cop_chauffage`, `sensor.pac_cop_instant`, `sensor.pac_cycle_moyen` (tâche 5) ; `/local/pac-circuit.svg` (tâche 6).
+- Consumes: `sensor.pac_etat`, `sensor.pac_depuis`, `sensor.pac_explication` (tâches 2 et 3) ; `sensor.pac_ecart_chauffage`, `sensor.pac_ecart_source`, `sensor.pac_temperature_du_sol` (tâche 4) ; `sensor.pac_rendement_eau_chaude`, `sensor.pac_rendement_chauffage`, `sensor.pac_rendement_instantane`, `sensor.pac_cycle_moyen` (tâche 5) ; `/local/pac-circuit.svg` (tâche 6).
 - Produces: le tableau à l'URL `/pac-chauffage/pac`, cible des liens de la tâche 8.
 
 - [ ] **Step 1: Écrire le tableau**
@@ -1031,7 +1038,7 @@ views:
               # Températures, posées où se trouve leur sonde. Les repères en
               # pourcentage sont ceux notés en tête de la tâche 6 du plan.
               - type: state-label
-                entity: sensor.pac_temperature_sol
+                entity: sensor.pac_temperature_du_sol
                 style: {top: 62%, left: 27%, color: white, font-size: 14px}
               - type: state-label
                 entity: sensor.luxtronik_300722_07_heat_source_output_temperature
@@ -1086,13 +1093,13 @@ views:
 
               {{ ligne('Écart source', 'sensor.pac_ecart_source', 'K', 'non mesurable, le compresseur est à l\'arrêt') }}
 
-              {{ ligne('Température du sol', 'sensor.pac_temperature_sol', '°C', 'sonde indisponible') }}
+              {{ ligne('Température du sol', 'sensor.pac_temperature_du_sol', '°C', 'sonde indisponible') }}
 
-              {{ ligne('Rendement eau chaude', 'sensor.pac_cop_ecs', '', 'pas encore de chauffe mesurée') }}
+              {{ ligne('Rendement eau chaude', 'sensor.pac_rendement_eau_chaude', '', 'pas encore de chauffe mesurée') }}
 
-              {{ ligne('Rendement chauffage', 'sensor.pac_cop_chauffage', '', 'la PAC n\'a pas encore chauffé la maison depuis la remise à zéro des compteurs') }}
+              {{ ligne('Rendement chauffage', 'sensor.pac_rendement_chauffage', '', 'la PAC n\'a pas encore chauffé la maison depuis la remise à zéro des compteurs') }}
 
-              {{ ligne('Rendement instantané', 'sensor.pac_cop_instant', '', 'le compresseur est à l\'arrêt') }}
+              {{ ligne('Rendement instantané', 'sensor.pac_rendement_instantane', '', 'le compresseur est à l\'arrêt') }}
 
               {{ ligne('Cycle moyen', 'sensor.pac_cycle_moyen', 'min', 'pas assez de démarrages pour se prononcer') }}
 
@@ -1134,7 +1141,7 @@ views:
                 name: Départ
               - entity: sensor.luxtronik_300722_07_flow_out_temperature
                 name: Retour
-              - entity: sensor.pac_temperature_sol
+              - entity: sensor.pac_temperature_du_sol
                 name: Sol
               - entity: sensor.luxtronik_300722_07_dhw_temperature
                 name: Ballon
@@ -1529,7 +1536,7 @@ pas observables compresseur arrêté et restent à vérifier à la première cha
 
 1. **Le COP instantané.** `current_heat_output` et `current_power_consumption`
    lisent 0 W à l'arrêt. Vérifier qu'ils rendent de vraies valeurs, et que
-   `sensor.pac_cop_instant` sort de `unavailable`.
+   `sensor.pac_rendement_instantane` sort de `unavailable`.
 2. **Les deux écarts.** Vérifier qu'ils deviennent disponibles, et que l'écart
    source devient franchement positif — il valait −0,1 K à l'arrêt.
 3. **Le sens des sondes.** En chauffe, `flow_in` doit dépasser `flow_out` de
