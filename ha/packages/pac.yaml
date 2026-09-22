@@ -44,9 +44,18 @@
 #   - LE SENS AFFICHÉ NE CHANGE PAS : heat_amount_heating valant 0 aujourd'hui,
 #     « depuis la remise à zéro des compteurs » et « depuis la création de ces
 #     deux compteurs » désignent exactement la même période.
-#   - CE QU'ILS NE PEUVENT PAS FAIRE : ce qui est produit pendant que Home
-#     Assistant est arrêté leur échappe. Les deux le perdent ensemble, donc le
-#     rapport reste juste ; ce sont les totaux qui sous-estiment.
+#   - periodically_resetting: false — SANS LUI, CHAQUE COUPURE ESCAMOTE UNE
+#     MESURE. Par défaut, un utility_meter suppose que sa source se remet à
+#     zéro périodiquement : sitôt qu'elle repasse par « unavailable », il
+#     refuse de comparer et la variation de la coupure est perdue. Or la
+#     coupure est fréquente — l'intégration luxtronik2 parle à la PAC par le
+#     réseau — et un redémarrage de Home Assistant en est une. À false, le
+#     compteur compare à sa dernière valeur valable, restaurée au démarrage,
+#     et traverse coupures comme redémarrages. Ces deux sources sont des
+#     total_increasing à vie, qui ne se remettent à zéro que le jour où on le
+#     leur demande sur la machine : la supposition par défaut est fausse ici.
+#     La protection contre une VRAIE remise à zéro demeure — un ajustement
+#     négatif est toujours jeté.
 #
 # AVANT LA PREMIÈRE CHAUFFE, LES DEUX SONT « unknown », ET C'EST NORMAL : un
 # utility_meter n'a pas d'état tant que sa source n'a pas varié, et ni
@@ -61,9 +70,11 @@ utility_meter:
   pac_chauffage_chaleur_nette:
     name: "PAC chauffage chaleur nette"
     source: sensor.luxtronik_300722_07_heat_amount_heating
+    periodically_resetting: false
   pac_chauffage_electricite_nette:
     name: "PAC chauffage électricité nette"
     source: sensor.luxtronik_300722_07_heat_energy_input
+    periodically_resetting: false
 
 template:
   # La durée dans l'état courant doit avancer toute seule, minute après
@@ -357,8 +368,12 @@ template:
       # LES QUATRE CAPTEURS DIVISENT, et c'est l'availability SEULE qui les
       # protège du diviseur nul : « | float(1) » ne rend 1 que si la
       # conversion échoue (« unknown »), jamais sur un état « 0.0 », qui se
-      # convertit très bien. Rendu à part, chacun des quatre state lève
-      # ZeroDivisionError (éprouvé le 22.09.2026). Home Assistant rend
+      # convertit très bien. Rendu à part, un state dont le diviseur vaut
+      # « 0.0 » lève ZeroDivisionError — éprouvé le 22.09.2026 sur trois
+      # d'entre eux. Le quatrième divise aujourd'hui par un compteur à
+      # « unknown », que float(1) convertit en 1 : il rend 0.0 au lieu de
+      # lever, mais l'avertissement vaut pour le jour où ce compteur vaudra
+      # vraiment 0, c'est-à-dire dès sa première lecture. Home Assistant rend
       # l'availability en premier et n'évalue ni le state ni les attributs
       # quand elle est fausse (helpers/event.py, « super template ») : ne
       # jamais retirer une de ces conditions.
@@ -393,9 +408,14 @@ template:
       # compresseur à 2,64 kW, moyenne mesurée). Sur un cumul de 0,2 kWh le
       # rapport afficherait « Excellent » à 20 ; sous 10 kWh il peut encore
       # être surestimé d'un quart ; au-delà il converge vite — 10 % à 26 kWh.
-      # Ce plancher retarde de quelques heures de chauffe la première annonce,
-      # et n'influe en rien sur la valeur annoncée, qui est celle des deux
-      # compteurs et d'eux seuls.
+      # Ce plancher retarde de quelques heures de chauffe la première annonce
+      # et N'INTRODUIT AUCUN BIAIS : il ne corrige pas le rapport, il plafonne
+      # une surestimation passagère entre deux postages du compteur
+      # électrique. C'est ce qui le distingue d'un plancher sur le RAPPORT,
+      # qui publierait sa propre valeur de seuil. Mieux : le dénominateur ne
+      # bougeant que par paliers, l'instant où il franchit 10 kWh est un
+      # instant de rattrapage — la première annonce tombe donc au moment le
+      # plus juste du cycle.
       - name: "PAC rendement chauffage"
         unique_id: pac_rendement_chauffage
         state_class: measurement
