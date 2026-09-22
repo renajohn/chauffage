@@ -335,3 +335,118 @@ chaque rechargement de page.
 - Les 45 entités Luxtronik encore désactivées, qui n'ont pas d'usage ici.
 - Une section dans `reglages.yaml` : elle n'a lieu d'être que si des helpers réglables
   apparaissent, et le choix des seuils en dur écarte ce cas.
+
+## Relevé de mise en service
+
+Le tableau a été déployé le 22 septembre 2026, compresseur à l'arrêt. La PAC a tourné le
+même jour **de 11 h 15 à 12 h 07**, une charge du ballon, et cette cinquantaine de
+minutes a réglé l'essentiel des questions que la construction avait laissées ouvertes.
+Ce qui suit distingue ce que cette chauffe a établi de ce qui attend encore une mesure.
+
+### Ce que la chauffe du 22 septembre a établi
+
+**Le sens des sondes.** En marche, `flow_in` lisait **49,2 °C** et `flow_out` **46,6 °C**.
+`flow_in` est donc bien le **départ** et `flow_out` le **retour**, et la contrainte
+globale posée par le spec tient. L'étiquetage inverse que portait `gen_maison.py` a été
+corrigé sur cette mesure : la vue Technique affiche désormais la valeur la plus haute
+sous « Départ » — vérifié au navigateur le soir même, 29,6 °C contre 24,4 °C.
+
+**Le COP instantané existe.** À pleine charge, `current_heat_output` rendait **9 789 W**
+thermiques pour **2 403 W** électriques, soit **4,07**. Les deux capteurs de puissance,
+activés le matin même et lus à 0 W depuis, donnent de vraies valeurs dès que le
+compresseur tourne ; `sensor.pac_rendement_instantane` sort de `unavailable` et sa tuile
+porte un verdict.
+
+**Les deux écarts se mesurent.** Ils sont sortis de `unavailable` avec des valeurs
+plausibles : **2,6 K** côté chauffage, **3,4 K** côté source. L'écart source est
+**positif**, comme attendu d'une machine qui prélève de la chaleur au sol — à l'arrêt il
+valait −0,1 K, un simple décalage de sonde.
+
+**C'est `status` qui fait foi pour l'eau chaude, pas la pompe de charge.** Pendant toute
+la charge, `sensor.…status` valait `hot_water` tandis que
+`binary_sensor.…dhw_charging_pump` restait à **`off`**. Une cascade d'état qui se fiait à
+ce binaire annonçait « Chauffe la maison » pendant une charge du ballon ; l'ordre des
+conditions a été repris pour lire `status` d'abord. Le binaire reste au schéma comme
+indicateur d'organe, il n'y décide de rien.
+
+**La température du forage se tait à bon droit.** À l'arrêt, les deux sondes de saumure
+lisent **~23,8 °C** — la température du local technique, pas celle du sol. Au démarrage
+de la pompe la lecture s'effondre à **13,6 °C**, descend à **12,8 °C** en quarante
+minutes, puis remonte à **16,8 °C** après l'arrêt. Le débit de saumure vaut **0 L/h** à
+l'arrêt et **2000 à 2200 L/h** en marche, sans valeur intermédiaire : le test de
+circulation est franc. La pompe de saumure déborde le compresseur d'une minute de chaque
+côté, ce qui donne au capteur la marge dont il a besoin pour ne pas clignoter aux
+transitions.
+
+### Ce qui reste ouvert
+
+**La valeur `cooling` n'a jamais été observée.** L'énumération complète de
+`sensor.…status` est `heating, hot_water, swimming_pool_solar, evu, defrost, no_request,
+heating_external_source, cooling`. Sur les jours relevés, `status` n'a pris que
+`no_request` et `hot_water`. Si le rafraîchissement passif ne produit pas `cooling` — et
+un rafraîchissement sans compresseur a de bonnes raisons de ne rien produire —, l'état
+« Rafraîchit » ne s'affichera jamais et il faudra le détecter autrement, vraisemblablement
+par la vanne de rafraîchissement ou par un écart inversé. À reprendre à la première
+journée chaude.
+
+**`heat_energy_input` porte un offset de 52,86 kWh.** Relevé le 22.09.2026 à 15 h :
+`heat_energy_input` = **52,86 kWh** pour un `heat_amount_heating` de **0,00 kWh** et
+**0 h** de chauffage depuis la remise à zéro. Ce compteur n'a pas été remis à zéro avec
+les autres. Le rendement chauffage se tait aujourd'hui, faute de chaleur produite ; le
+jour où il s'allumera, il sera **faussement bas** et le restera jusqu'à ce que la
+production rattrape l'offset. Cela se règle sur la PAC, pas dans Home Assistant.
+
+**Les deux compteurs ECS ne progressent pas ensemble.** Échantillonnés toutes les 30 s
+pendant la charge, `dhw_heat_amount` est passé de 15,0 à 19,8 kWh tandis que
+`dhw_energy_input` restait **figé à 4,12**. Le rendement eau chaude est donc
+**surestimé pendant et juste après une charge** : il est monté à **4,81**. Il est
+redescendu à **3,97** en fin de journée (23,10 kWh pour 5,82 kWh), ce qui ressemble à un
+compteur électrique qui rattrape par paliers plutôt qu'à un biais permanent. À observer
+sur un cycle complet avant de décider quoi que ce soit — lisser la valeur, la masquer
+pendant la charge, ou la laisser telle quelle avec sa mention dans le verdict.
+
+**Le cycle moyen attend dix démarrages.** `compressor1_impulses` en compte **trois**, pour
+**2,4 h** de compresseur. La tuile dit « Pas assez de démarrages pour se prononcer », et
+elle le dira encore un moment.
+
+**Les seuils des verdicts sont des valeurs de littérature**, pas des mesures sur cette
+installation. Le verdict « Très faible » sous 2 K s'affichera vraisemblablement au
+démarrage de chaque cycle, avant que l'eau du plancher ait pris sa température : l'écart
+observé montait à 2,6 K en régime, il est passé par des valeurs plus basses avant. À
+revoir après une saison, seuils en main.
+
+**Le tableau n'a jamais été vu compresseur en marche.** Il a été construit après l'arrêt
+de 12 h 07. Les trois icônes d'organes du schéma — compresseur, pompe de charge, pompe de
+circulation — n'ont été jugées qu'éteintes, et la mise en page du bandeau « En ce
+moment » n'a jamais porté une phrase de causalité longue, celle d'une chauffe réelle. À
+regarder à la première chauffe observée en direct.
+
+### Ce que la vérification au navigateur a constaté
+
+Relevé le 22.09.2026, PAC à l'arrêt, sur `/pac-chauffage/pac` : l'état de tête se lit en
+français avec sa durée (« Au-dessus de la limite de chauffe », *depuis 30 min*), le
+schéma s'affiche avec ses cinq flèches — une rouge vers le ballon, une rouge vers le
+plancher, une bleue du plancher vers la PAC, et les deux de la boucle de saumure — et
+chaque température tombe sur l'organe qu'elle désigne. Les sept indicateurs de santé
+portent soit une valeur et un verdict, soit une raison de se taire ; **aucun
+`unavailable` ni `unknown` brut n'apparaît nulle part**, ni en large ni en 390 px. Aucune
+carte en erreur, aucun « Custom element doesn't exist ». Les cartes remplissent leur
+section (376 px dans 376, 784 dans 784), et à 390 px la page ne défile pas
+horizontalement.
+
+Deux réserves de lecture, sans gravité et laissées telles quelles :
+
+- À 390 px, le schéma reste lisible mais devient **dense** : les pastilles de valeur
+  recouvrent la pointe de certaines flèches et frôlent les icônes de pompe. Le dessin est
+  compris, les chiffres se lisent ; c'est le prix d'un schéma de 800 px dans une colonne
+  de 374.
+- Sur la vue « Maison », le sous-texte vivant de la tuile « PAC » est **tronqué à
+  « Au-dessus de la … »** dans une tuile de quatre colonnes. La tuile renseigne donc
+  moins qu'espéré ; un libellé court dérivé de l'état rendrait le service que la phrase
+  complète ne peut pas rendre à cette largeur. Le clic mène bien au tableau.
+
+Sur la vue « Technique », la carte PAC est en tête, « Départ » porte la valeur la plus
+haute et **la puce « Compresseur à l'arrêt » a disparu**. Il reste la puce de `status`,
+qui affiche l'énumération brute de la PAC — « Idle (no request) », en anglais, sur un
+tableau français. Elle vient de `gen_maison.py` et non de `pac.yaml` ; elle mériterait le
+même traitement que le reste.
