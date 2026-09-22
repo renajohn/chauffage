@@ -66,14 +66,22 @@ template:
       # nom inattendu, que les tableaux référenceraient dans le vide.
       - name: "PAC état"
         unique_id: pac_etat
-        # L'icône suit une règle plus courte que l'état : la dupliquer en
-        # entier n'apporterait rien.
+        # L'icône suit une règle plus courte que l'état : « Au-dessus de la
+        # limite de chauffe » et « Au repos » partagent mdi:sleep, la PAC
+        # étant arrêtée dans les deux cas. Mais l'ordre des branches est
+        # exactement celui de la cascade d'états, et aucune branche qui
+        # change la DIRECTION thermique n'est fondue dans une autre :
+        # 'cooling' passe avant le compresseur, sans quoi « Rafraîchit »
+        # s'afficherait sous une icône de chauffage.
         icon: >-
           {% set lux = 'luxtronik_300722_07_' %}
+          {% set statut = states('sensor.' ~ lux ~ 'status') %}
           {% if not has_value('sensor.' ~ lux ~ 'status') %}mdi:lan-disconnect
           {% elif is_state('binary_sensor.' ~ lux ~ 'disturbance_output', 'on') %}mdi:alert-circle
           {% elif is_state('binary_sensor.' ~ lux ~ 'defrost_valve', 'on') %}mdi:snowflake-melt
+          {% elif is_state('binary_sensor.' ~ lux ~ 'evu_unlocked', 'off') %}mdi:transmission-tower-off
           {% elif is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}mdi:water-boiler
+          {% elif statut == 'cooling' %}mdi:snowflake
           {% elif is_state('binary_sensor.' ~ lux ~ 'compressor', 'on') %}mdi:heat-wave
           {% else %}mdi:sleep{% endif %}
         # ÉTAT DE PANNE : disturbance_output, jamais error_reason. Ce dernier
