@@ -193,30 +193,59 @@ template:
             {% elif d <= 6 %}Un peu élevé : à surveiller.
             {% else %}Élevé : débit de saumure faible, ou terrain qui ne suit plus.{% endif %}
 
-      - name: "PAC température du sol"
-        unique_id: pac_temperature_du_sol
+      - name: "PAC température du forage"
+        unique_id: pac_temperature_du_forage
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
         icon: mdi:thermometer-water
-        # La saumure qui REVIENT des capteurs enterrés : c'est elle qui porte
-        # la chaleur prise au terrain. L'entité est désactivée par défaut dans
+        # La saumure qui REVIENT du forage — une sonde géothermique
+        # VERTICALE, pas un capteur horizontal : c'est elle qui porte la
+        # chaleur prise au forage. L'entité est désactivée par défaut dans
         # l'intégration ; activée le 22.09.2026.
-        availability: "{{ has_value('sensor.luxtronik_300722_07_heat_source_input_temperature') }}"
+        #
+        # GARDE SUR LE DÉBIT DE SAUMURE. Saumure immobile, les deux sondes ne
+        # lisent plus le forage mais le LOCAL TECHNIQUE où elles sont posées.
+        # Mesuré le 22.09.2026 (heures locales) :
+        #   07:00 -> 11:16  circulation arrêtée   23,7 à 23,9 °C
+        #   11:16:05        pompe de saumure      0 -> 2100 L/h
+        #   11:17:05        compresseur           marche
+        #   11:16 -> 11:19  la lecture s'effondre 23,8 -> 15,5 -> 13,6 °C
+        #   11:19 -> 12:03  en marche             13,6 -> 12,8 °C, le forage
+        #                                         rend sa chaleur
+        #   12:06:24        compresseur           arrêt
+        #   12:07:24        pompe de saumure      2100 -> 0 L/h
+        #   12:07 -> 12:26  le fluide stagne      13,5 -> 16,9 °C
+        # Sans cette garde, le capteur annonçait « Tiède : le forage s'est
+        # rechargé, typique de l'été » à partir d'une lecture de local
+        # technique. NE PAS LA RETIRER en croyant qu'une température se lit
+        # toujours : celle-ci ne veut dire quelque chose que si le fluide
+        # circule.
+        #
+        # LE DÉBIT PLUTÔT QUE LE COMPRESSEUR, pour deux raisons. C'est une
+        # mesure directe de la circulation : 0 L/h à l'arrêt, 2000 à 2200 L/h
+        # en marche, sans valeur intermédiaire sur l'historique du jour. Et la
+        # pompe de saumure déborde le compresseur des deux côtés — une minute
+        # avant au démarrage, une minute après à l'arrêt — en plus du
+        # rafraîchissement passif, où elle tourne sans compresseur du tout. Un
+        # guet sur le compresseur perdrait ces trois cas.
+        availability: >-
+          {{ states('sensor.luxtronik_300722_07_heat_source_flow_rate') | float(0) > 0
+             and has_value('sensor.luxtronik_300722_07_heat_source_input_temperature') }}
         state: >-
           {{ states('sensor.luxtronik_300722_07_heat_source_input_temperature')
              | float(0) | round(1) }}
         attributes:
           # Au-dessus de 0 °C en saison de chauffe, confortable ; sous -5 °C,
-          # le terrain est sollicité au-delà de sa plage habituelle. Ce
-          # verdict-là reste valable à l'arrêt : c'est une température, pas un
-          # écart.
+          # le forage est sollicité au-delà de sa plage habituelle. Ces
+          # bornes ne valent que sur une lecture de forage, donc saumure en
+          # circulation : c'est l'availability ci-dessus qui le garantit.
           verdict: >-
             {% set t = states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0) | round(1) %}
-            {% if t < -5 %}Très froid : le terrain est sollicité au-delà de sa plage habituelle.
+            {% if t < -5 %}Très froid : le forage est sollicité au-delà de sa plage habituelle.
             {% elif t < 0 %}Froid, mais dans la plage d'une fin d'hiver.
-            {% elif t < 15 %}Normal pour un terrain en saison de chauffe.
-            {% else %}Tiède : le terrain s'est rechargé, typique de l'été.{% endif %}
+            {% elif t < 15 %}Normal pour un forage en saison de chauffe.
+            {% else %}Tiède : le forage s'est rechargé, typique de l'été.{% endif %}
 
 
       # LES RENDEMENTS SONT CALCULÉS ICI, jamais lus depuis sensor.…cop_dhw

@@ -12,7 +12,7 @@
        carte y pose une valeur. Déplacer un trait ici, c'est déplacer la
        valeur qui le nomme — les deux se relisent ensemble.
 
-         sol             12/67   bande libre en haut du bloc de terre
+         forage          12/67   bande libre en haut du bloc de terre
          saumure retour  27/70   au-dessus du tuyau qui vient du sol (y=290)
          saumure aller   27/90   sous le tuyau qui repart au sol (y=350)
          PAC             50/50   entre le titre et le compresseur
@@ -35,10 +35,10 @@
     </marker>
   </defs>
 
-  <!-- Le sol -->
+  <!-- Le forage -->
   <rect x="20" y="250" width="160" height="130" rx="8" fill="#78350f" opacity="0.35"/>
   <text x="100" y="242" text-anchor="middle" font-family="sans-serif"
-        font-size="15" fill="#94a3b8">Le sol</text>
+        font-size="15" fill="#94a3b8">Forage</text>
   <path d="M40 290 h120 M40 320 h120 M40 350 h120" stroke="#0ea5e9"
         stroke-width="5" fill="none" stroke-linecap="round" opacity="0.8"/>
 
