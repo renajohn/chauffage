@@ -1,0 +1,38 @@
+# Pompe à chaleur géothermique Alpha Innotec — lecture expliquée.
+#
+# Ce paquet ne pilote rien. Il traduit les entités de l'intégration
+# luxtronik2 (préfixe luxtronik_300722_07_, Alpha Innotec @
+# 192.168.86.37:8889) en capteurs qu'on comprend sans connaître les sigles
+# allemands. Le pilotage de la consigne ECS vit ailleurs, dans
+# packages/ecs_solaire.yaml : ne pas écrire de consigne ici.
+#
+# SOURCE DE VÉRITÉ : dépôt chauffage, ha/packages/pac.yaml, déployé par
+# deploy/deploy-ha.sh. Ne pas éditer sur p-cloud.
+#
+# Sens des sondes, établi le 22.09.2026 : flow_in = DÉPART (Vorlauf),
+# flow_out = RETOUR (Rücklauf). flow_out_temperature_target vaut 15,0 et
+# correspond à temperature_target_return lu en direct sur la PAC ; or la
+# régulation Alpha Innotec pilote sur le retour. La lecture directe donne
+# temperature_supply 24,0 (= flow_in) et temperature_return 23,5 (= flow_out).
+
+template:
+  - sensor:
+      # Le nom dit « température sol » et non « du sol » : Home Assistant
+      # fabrique l'identifiant d'entité à partir du nom affiché, et « du »
+      # donnerait sensor.pac_temperature_du_sol. La règle du dépôt veut
+      # unique_id = identifiant d'entité sans le domaine, donc
+      # sensor.pac_temperature_sol. object_id, qui aurait permis de garder le
+      # « du », est refusé par le domaine template (vérifié en 2026.9.3).
+      - name: "PAC température sol"
+        unique_id: pac_temperature_sol
+        unit_of_measurement: "°C"
+        device_class: temperature
+        state_class: measurement
+        icon: mdi:thermometer-water
+        # La saumure qui REVIENT des capteurs enterrés : c'est elle qui porte
+        # la chaleur prise au terrain. L'entité est désactivée par défaut dans
+        # l'intégration ; activée le 22.09.2026.
+        availability: "{{ has_value('sensor.luxtronik_300722_07_heat_source_input_temperature') }}"
+        state: >-
+          {{ states('sensor.luxtronik_300722_07_heat_source_input_temperature')
+             | float(0) | round(1) }}
