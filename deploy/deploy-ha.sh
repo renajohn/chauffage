@@ -124,15 +124,27 @@ restaure() {
   fi
   if [ "$ECHEC_R" = 0 ]; then return 0; fi
   echo "LE RETOUR EN ARRIÈRE A ÉCHOUÉ. /config contient peut-être une" >&2
-  echo "configuration invalide. La remettre à la main depuis :" >&2
+  echo "configuration invalide : la corriger avant tout redémarrage de Home" >&2
+  echo "Assistant." >&2
   RESTES=$(echo "$SORTIE_R" | sed -n 's/^RESTES://p')
-  # Liste vide : le fragment n'a pas pu parler (ssh ou docker exec en échec),
-  # donc aucun mv n'a eu lieu et toutes les sauvegardes sont encore là.
-  if [ -z "$RESTES" ]; then
-    for f in $SAUVES; do RESTES="$RESTES /config/$f.bak-$STAMP"; done
+  # Le repli s'arme sur « le fragment n'a rien dit du tout », jamais sur
+  # « il n'a pas dit RESTES: ». Muet, c'est que ni le ssh ni le docker exec
+  # n'ont abouti : aucun mv n'a eu lieu, toutes les sauvegardes sont là et les
+  # nommer est juste. Dès qu'il a parlé, seule sa parole compte — une liste
+  # déduite de $SAUVES nommerait des .bak qu'un mv a consommés, ou qui n'ont
+  # jamais existé, et le message se contredirait dans le même écran.
+  if [ -z "$SORTIE_R" ]; then
+    echo "Le fragment distant n'a rien dit : aucun fichier n'a bougé, les" >&2
+    echo "sauvegardes sont toutes en place. Les remettre à la main :" >&2
+    for f in $SAUVES; do echo "  /config/$f.bak-$STAMP" >&2; done
+  elif [ -n "$RESTES" ]; then
+    echo "Sauvegardes encore en place, à remettre à la main :" >&2
+    for b in $RESTES; do echo "  $b" >&2; done
+  else
+    echo "Aucune sauvegarde à remettre en place : ce qui est resté en l'état" >&2
+    echo "est nommé plus haut, par les lignes « ÉCHEC : » et par la sortie du" >&2
+    echo "retour en arrière." >&2
   fi
-  for b in $RESTES; do echo "  $b" >&2; done
-  echo "avant tout redémarrage de Home Assistant." >&2
 }
 
 # La sortie du ssh est capturée pour être relue : check_config sort en 0 même
