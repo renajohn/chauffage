@@ -43,6 +43,16 @@
   `or`, elle ne coûte rien.
 - **Valeurs de `status` observées à ce jour :** `no_request` et `hot_water`. `heating` et
   `cooling` restent non observées.
+- **La température du sol n'a de sens que saumure en circulation.** Mesuré le 22.09.2026 :
+  à l'arrêt les deux sondes de saumure affichent ~23,8 °C — la température du local technique,
+  pas celle du forage. À la seconde où la pompe démarre, la lecture s'effondre à 13,6 °C, puis
+  descend à 12,8 °C en quarante minutes de marche (le forage se refroidit à mesure qu'on lui
+  prend de la chaleur), et remonte à 16,8 °C une fois la pompe arrêtée. Un verdict rendu à
+  l'arrêt annonçait « Tiède : le terrain s'est rechargé, typique de l'été » sur une lecture de
+  local technique. La condition de disponibilité est
+  `sensor.…heat_source_flow_rate > 0` — mesure directe de circulation (0 L/h à l'arrêt,
+  2000–2200 L/h en marche), qui couvre aussi le rafraîchissement passif où la pompe tourne sans
+  compresseur.
 - **État de panne :** `binary_sensor.…disturbance_output`, jamais `sensor.…error_reason`. Ce dernier vaut 721 sans discontinuer depuis au moins 5 jours alors que la PAC va bien : c'est la **dernière** erreur mémorisée, pas une erreur active.
 - **Hôte :** p-cloud, conteneur `homeassistant`, configuration dans `/home/rjl/homelab/homeassistant/config` (montée sur `/config`).
 - **API Home Assistant :** `https://ha.lab.crog.org`, jeton dans la variable d'environnement `$HA`.
