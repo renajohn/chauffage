@@ -292,6 +292,12 @@ views:
             secondary: >-
               {% if has_value('sensor.pac_rendement_eau_chaude') %}{{ state_attr('sensor.pac_rendement_eau_chaude', 'verdict') }}{% else %}Pas encore de chauffe mesurée.{% endif %}
             multiline_secondary: true
+          # LA RAISON NOMME LE COMPTEUR FAUTIF. Ce rendement ne se lit pas sur
+          # les compteurs de la PAC : heat_energy_input affiche 52,86 kWh pour
+          # 0 kWh produit, il n'a pas été remis à zéro avec les autres. Le
+          # paquet compte donc lui-même, par deux utility_meter, et la tuile se
+          # tait jusqu'à ce qu'il y ait de quoi se prononcer. Sans cette
+          # phrase, un tableau muet passerait pour un tableau en panne.
           - type: custom:mushroom-template-card
             grid_options:
               columns: full
@@ -300,7 +306,7 @@ views:
             icon_color: "{{ 'blue' if has_value('sensor.pac_rendement_chauffage') else 'disabled' }}"
             primary: "Rendement chauffage{% if has_value('sensor.pac_rendement_chauffage') %} — {{ states('sensor.pac_rendement_chauffage') }}{% endif %}"
             secondary: >-
-              {% if has_value('sensor.pac_rendement_chauffage') %}{{ state_attr('sensor.pac_rendement_chauffage', 'verdict') }}{% else %}La PAC n'a pas encore chauffé la maison depuis la remise à zéro des compteurs.{% endif %}
+              {% if has_value('sensor.pac_rendement_chauffage') %}{{ state_attr('sensor.pac_rendement_chauffage', 'verdict') }}{% else %}Pas encore assez de chauffe mesurée. Le compteur d'entrée de la PAC n'a pas été remis à zéro (52,86 kWh pour 0 produit) : on compte nous-mêmes depuis le 22.09.2026.{% endif %}
             multiline_secondary: true
           - type: custom:mushroom-template-card
             grid_options:

@@ -15,6 +15,48 @@
 # régulation Alpha Innotec pilote sur le retour. La lecture directe donne
 # temperature_supply 24,0 (= flow_in) et temperature_return 23,5 (= flow_out).
 
+# DEUX COMPTEURS À NOUS POUR LE RENDEMENT CHAUFFAGE, parce que celui de la PAC
+# est sale. Relevé du 22.09.2026 : heat_energy_input affiche 52,86 kWh alors
+# que heat_amount_heating vaut 0,00 kWh et operation_hours_heating 0 h. Ce
+# compteur n'a pas été remis à zéro avec les autres, et son résidu est pur et
+# permanent : pendant la charge du ballon du même jour, dhw_energy_input est
+# passé de 4,12 à 5,82 kWh sans que heat_energy_input bouge d'un centième.
+#
+# AUCUN SEUIL NE RATTRAPE UN OFFSET AU DÉNOMINATEUR, il ne fait que retarder le
+# mensonge. Le rapport publié vaudrait H / (52,86 + H/COP) : avec le COP réel
+# de cette machine (4,07 mesuré le 22.09.2026), il passe 1,5 à 127 kWh
+# produits, 2,96 à 600 kWh, 3,62 à 2000 kWh et 3,84 sur une saison entière. Une
+# condition « rapport ≥ 1,5 » publierait donc 1,5 le jour où elle se débloque,
+# verdict « Faible : à regarder de près. », puis « Moyen » tout l'hiver pour
+# une machine qui vaut « Bon ». Le seuil ne change que la date de la fausse
+# annonce — et tout seuil assez haut pour rendre le chiffre juste (≈ 3,6)
+# interdirait du même coup au capteur de jamais annoncer un mauvais rendement.
+#
+# utility_meter ne retient que les VARIATIONS de sa source. Les 52,86 kWh,
+# acquis avant la création du compteur, n'y entrent jamais ; le rapport des
+# deux est juste dès la première chauffe, sans rien attendre et sans rien
+# supposer du COP.
+#   - LES DEUX, ET PAS UN SEUL. Le jour où le propriétaire remettra les
+#     compteurs de la PAC à zéro, un numérateur qui repart de zéro sur un
+#     dénominateur qui continue donnerait à nouveau un chiffre faux. Deux
+#     compteurs de même origine ne peuvent pas se désynchroniser, et
+#     utility_meter absorbe la baisse de sa source sans rien soustraire.
+#   - LE SENS AFFICHÉ NE CHANGE PAS : heat_amount_heating valant 0 aujourd'hui,
+#     « depuis la remise à zéro des compteurs » et « depuis la création de ces
+#     deux compteurs » désignent exactement la même période.
+#   - CE QU'ILS NE PEUVENT PAS FAIRE : ce qui est produit pendant que Home
+#     Assistant est arrêté leur échappe. Les deux le perdent ensemble, donc le
+#     rapport reste juste ; ce sont les totaux qui sous-estiment.
+# Ne JAMAIS revenir à une lecture directe de heat_energy_input sans avoir
+# d'abord vérifié, sur la PAC, que ce compteur est reparti de zéro.
+utility_meter:
+  pac_chauffage_chaleur_nette:
+    name: "PAC chauffage chaleur nette"
+    source: sensor.luxtronik_300722_07_heat_amount_heating
+  pac_chauffage_electricite_nette:
+    name: "PAC chauffage électricité nette"
+    source: sensor.luxtronik_300722_07_heat_energy_input
+
 template:
   # La durée dans l'état courant doit avancer toute seule, minute après
   # minute. Un capteur d'état ne se recalcule qu'au changement de ses
@@ -294,26 +336,37 @@ template:
             {% elif c >= 3 %}Correct : chauffer à 54 °C coûte toujours plus que chauffer un plancher.
             {% else %}Faible : la PAC peine à monter le ballon.{% endif %}
 
-      # PAS DE BASE SAINE TANT QUE heat_amount_heating VAUT 0. Au 22.09.2026 il
-      # vaut 0 kWh et operation_hours_heating 0 h — la PAC n'a pas chauffé la
-      # maison depuis la remise à zéro — mais heat_energy_input affiche
-      # 52,86 kWh. Un compteur d'entrée qui tourne pour une sortie nulle est
-      # incohérent : celui-là n'a pas été remis à zéro avec les autres.
-      # Annoncer un rendement de 0 serait un mensonge, d'où l'availability.
+      # CE CAPTEUR NE LIT PAS LES COMPTEURS DE LA PAC, mais les deux
+      # utility_meter déclarés en tête de fichier : heat_energy_input porte un
+      # résidu de 52,86 kWh qui fausserait le rapport tout l'hiver. Le
+      # raisonnement complet, chiffres à l'appui, est là-haut.
+      #
+      # LE PLANCHER DE 10 kWh AU DÉNOMINATEUR n'est pas le garde-fou du
+      # diviseur nul, c'est celui des PALIERS. Le compteur électrique de la PAC
+      # ne poste sa consommation qu'en fin de cycle : mesuré le 22.09.2026 côté
+      # eau chaude, dhw_heat_amount est monté de 15,0 à 19,8 kWh pendant que
+      # dhw_energy_input restait figé à 4,12, puis a rattrapé d'un bloc de
+      # 1,70 kWh. Un cycle non encore posté vaut au plus ~2,6 kWh (une heure de
+      # compresseur à 2,64 kW, moyenne mesurée). Sur un cumul de 0,2 kWh le
+      # rapport afficherait « Excellent » à 20 ; sous 10 kWh il peut encore
+      # être surestimé d'un quart ; au-delà il converge vite — 10 % à 26 kWh.
+      # Ce plancher retarde de quelques heures de chauffe la première annonce,
+      # et n'influe en rien sur la valeur annoncée, qui est celle des deux
+      # compteurs et d'eux seuls.
       - name: "PAC rendement chauffage"
         unique_id: pac_rendement_chauffage
         state_class: measurement
         icon: mdi:radiator
         availability: >-
-          {{ states('sensor.luxtronik_300722_07_heat_amount_heating') | float(0) > 0.1
-             and states('sensor.luxtronik_300722_07_heat_energy_input') | float(0) > 0.1 }}
+          {{ states('sensor.pac_chauffage_chaleur_nette') | float(0) > 0.1
+             and states('sensor.pac_chauffage_electricite_nette') | float(0) > 10 }}
         state: >-
-          {{ (states('sensor.luxtronik_300722_07_heat_amount_heating') | float(0)
-              / states('sensor.luxtronik_300722_07_heat_energy_input') | float(1)) | round(2) }}
+          {{ (states('sensor.pac_chauffage_chaleur_nette') | float(0)
+              / states('sensor.pac_chauffage_electricite_nette') | float(1)) | round(2) }}
         attributes:
           verdict: >-
-            {% set c = (states('sensor.luxtronik_300722_07_heat_amount_heating') | float(0)
-                       / states('sensor.luxtronik_300722_07_heat_energy_input') | float(1)) | round(2) %}
+            {% set c = (states('sensor.pac_chauffage_chaleur_nette') | float(0)
+                       / states('sensor.pac_chauffage_electricite_nette') | float(1)) | round(2) %}
             {% if c >= 4.5 %}Excellent pour de la géothermie sur plancher.
             {% elif c >= 4 %}Bon.
             {% elif c >= 3 %}Moyen : la courbe de chauffe est peut-être trop haute.
