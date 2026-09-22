@@ -18,8 +18,9 @@
 #   - DÉCLARATION d'un nouveau tableau dans configuration.yaml
 #                           -> redémarrer Home Assistant
 #
-# check_config NE VALIDE PAS les tableaux de bord. Leur rendu se vérifie au
-# navigateur.
+# check_config NE VALIDE PAS les tableaux de bord. Leur SYNTAXE est donc
+# contrôlée ici, en local et avant tout envoi (yaml.safe_load) ; leur RENDU se
+# vérifie au navigateur, il n'y a pas d'autre moyen.
 #
 # Le dossier de configuration appartient à root : on y écrit à travers le
 # conteneur (docker cp), pas par le volume monté.
@@ -33,6 +34,25 @@ STAMP=$(date +%Y-%m-%d-%H%M%S)
 # fichier était absent, donc je le supprime » de « la sauvegarde n'a jamais
 # tourné, donc je ne touche à rien ».
 ABSENTS="/tmp/pac-absents-$STAMP"
+
+# LE SEUL CHEMIN QUE LE « TOUT OU RIEN » NE COUVRAIT PAS. check_config ne lit
+# pas les tableaux de bord (l'en-tête de ce script le dit) : un
+# dashboards/pac.yaml syntaxiquement cassé partait en production, check_config
+# passait, le script sortait en 0 en annonçant « OK » et aucun retour en
+# arrière ne partait. Le contrôle est LOCAL et AVANT LE PREMIER ENVOI : quand
+# il refuse, rien n'a bougé, ni sur p-cloud ni dans le conteneur, donc il n'y a
+# rien à restaurer et la logique de retour en arrière n'est pas concernée. Il
+# ne juge que la syntaxe YAML — le rendu Lovelace, lui, se vérifie au
+# navigateur, il n'y a pas d'autre moyen.
+if [ -f ha/dashboards/pac.yaml ] && ! python3 -c 'import sys, yaml
+try:
+    yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
+except (yaml.YAMLError, UnicodeDecodeError) as e:
+    sys.exit(str(e))' ha/dashboards/pac.yaml; then
+  echo "ha/dashboards/pac.yaml n'est pas un YAML valide (raison ci-dessus)." >&2
+  echo "Rien n'a été copié sur p-cloud : /config est intact." >&2
+  exit 1
+fi
 
 scp -q ha/packages/pac.yaml "$HOST:/tmp/pac-package.yaml"
 # Une copie par ligne, jamais chaînée par « && » : dans une liste AND, l'échec
@@ -196,5 +216,17 @@ if echo "$SORTIE" | grep -qiE 'error|incorrect config|failed'; then
   echo "recharger. La raison est dans la sortie ci-dessus." >&2
   restaure
   exit 1
+fi
+# MÉNAGE DES SAUVEGARDES DE www/, ET D'ELLES SEULES. Tout ce qui est dans
+# /config/www est SERVI PUBLIQUEMENT : /local/pac-circuit.svg.bak-2026-09-22-…
+# répondait, et une sauvegarde de plus s'y ajoutait à chaque déploiement (seize
+# au 22.09.2026). Le déploiement ayant réussi, ces copies n'ont plus d'objet :
+# le retour en arrière est derrière nous et la version précédente est dans le
+# dépôt. Celles de packages/ et de dashboards/ ne sont pas servies et restent
+# en place. Le ménage est APRÈS le succès et son échec n'invalide rien : il ne
+# fait pas partie du tout ou rien et ne touche pas au retour en arrière.
+if ! ssh "$HOST" "docker exec homeassistant sh -c 'rm -f /config/www/pac-circuit.svg.bak-*'"; then
+  echo "avertissement : les sauvegardes de /config/www n'ont pas pu être" >&2
+  echo "retirées. Le déploiement, lui, a réussi." >&2
 fi
 echo "OK. Recharger la configuration YAML dans Home Assistant."
