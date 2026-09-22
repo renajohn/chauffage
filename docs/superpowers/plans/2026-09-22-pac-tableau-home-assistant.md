@@ -873,7 +873,26 @@ git commit -m "Compute the three COPs and the mean compressor cycle"
 
 **Interfaces:**
 - Consumes: `deploy/deploy-ha.sh` (Task 1), qui déploie le SVG s'il existe.
-- Produces: `/local/pac-circuit.svg`, fond de la carte `picture-elements` de la tâche 7. Repères de position, en pourcentage de la largeur et de la hauteur, à l'usage de cette carte : sol 11/78, saumure retour 27/62, saumure aller 27/90, PAC 50/50, gaz chaud 50/28, départ 73/30, retour 73/70, ballon 90/22, plancher 90/78.
+- Produces: `/local/pac-circuit.svg`, fond de la carte `picture-elements` de la tâche 7.
+
+**Contrat des repères, en % (gauche/haut), établi et vérifié au calque le 22.09.2026** — un
+rectangle de 60×18 px, taille d'une étiquette réelle, posé à chaque coordonnée : aucun ne
+chevauche un trait, aucun ne flotte dans le vide.
+
+| repère | % | désigne |
+|---|---|---|
+| sol | 12/67 | bande libre en haut du bloc de terre |
+| saumure retour | 27/70 | le tuyau qui vient du sol |
+| saumure aller | 27/90 | le tuyau qui repart au sol |
+| PAC | 50/50 | entre le titre et le cercle du compresseur |
+| gaz chaud | 50/62 | dans le cercle, laissé creux pour cela |
+| départ | 68/38 | au-dessus du tronc, loin du point de dérivation |
+| retour | 68/70 | au-dessus du tuyau de retour |
+| ballon | 90/22 | dans le ballon |
+| plancher | 90/85 | bande libre sous la boucle du plancher |
+
+Deux marges étroites : « gaz chaud » ne dispose que de 68 px de large, « PAC » que de 66 px de
+haut — un texte sur deux lignes y toucherait le titre ou le cercle.
 
 - [ ] **Step 1: Écrire le SVG**
 
@@ -1032,7 +1051,7 @@ views:
           - type: markdown
             grid_options:
               columns: full
-            content: >-
+            content: |-
               ## {{ states('sensor.pac_etat') }}
 
               *depuis {{ states('sensor.pac_depuis') }}*
@@ -1055,25 +1074,25 @@ views:
               # pourcentage sont ceux notés en tête de la tâche 6 du plan.
               - type: state-label
                 entity: sensor.pac_temperature_du_sol
-                style: {top: 62%, left: 27%, color: white, font-size: 14px}
+                style: {top: 70%, left: 27%, color: white, font-size: 14px}
               - type: state-label
                 entity: sensor.luxtronik_300722_07_heat_source_output_temperature
                 style: {top: 90%, left: 27%, color: white, font-size: 14px}
               - type: state-label
                 entity: sensor.luxtronik_300722_07_hot_gas_temperature
-                style: {top: 28%, left: 50%, color: white, font-size: 14px}
+                style: {top: 62%, left: 50%, color: white, font-size: 14px}
               - type: state-label
                 entity: sensor.luxtronik_300722_07_flow_in_temperature
-                style: {top: 30%, left: 73%, color: white, font-size: 14px}
+                style: {top: 38%, left: 68%, color: white, font-size: 14px}
               - type: state-label
                 entity: sensor.luxtronik_300722_07_flow_out_temperature
-                style: {top: 70%, left: 73%, color: white, font-size: 14px}
+                style: {top: 70%, left: 68%, color: white, font-size: 14px}
               - type: state-label
                 entity: sensor.luxtronik_300722_07_dhw_temperature
                 style: {top: 22%, left: 90%, color: white, font-size: 14px}
               - type: state-label
                 entity: sensor.luxtronik_300722_07_outdoor_temperature
-                style: {top: 8%, left: 11%, color: white, font-size: 14px}
+                style: {top: 8%, left: 12%, color: white, font-size: 14px}
               # Organes, allumés ou éteints.
               - type: state-icon
                 entity: binary_sensor.luxtronik_300722_07_compressor
@@ -1082,11 +1101,11 @@ views:
               - type: state-icon
                 entity: binary_sensor.luxtronik_300722_07_pump_flow
                 title: Pompe de circulation
-                style: {top: 50%, left: 73%}
+                style: {top: 42%, left: 63%}
               - type: state-icon
                 entity: binary_sensor.luxtronik_300722_07_dhw_charging_pump
                 title: Pompe de charge du ballon
-                style: {top: 14%, left: 75%}
+                style: {top: 26%, left: 78%}
 
       - type: grid
         cards:
@@ -1100,7 +1119,7 @@ views:
             # Chaque indicateur dit sa valeur ET son verdict, ou pourquoi il se
             # tait. Les deux écarts ne veulent rien dire compresseur à
             # l'arrêt : l'eau stagne et les sondes s'équilibrent.
-            content: >-
+            content: |-
               {% macro ligne(nom, eid, unite, muet) %}
               **{{ nom }}** — {% if has_value(eid) %}{{ states(eid) }} {{ unite }} · {{ state_attr(eid, 'verdict') }}{% else %}{{ muet }}{% endif %}
               {% endmacro %}
@@ -1130,7 +1149,7 @@ views:
               columns: full
             # Seul le circuit 2 est réel : les circuits 1 et 3 lisent 75 °C,
             # valeur sentinelle de sonde absente (vérifié le 22.09.2026).
-            content: >-
+            content: |-
               À −15 °C dehors la PAC vise **{{ states('number.luxtronik_300722_07_heating_curve_circuit2_end_temperature') }} °C**
               au retour ; à +20 °C, **{{ states('number.luxtronik_300722_07_heating_curve_circuit2_parallel_shift_temperature') }} °C**.
               Abaissement de nuit : {{ states('number.luxtronik_300722_07_heating_curve_circuit2_night_temperature') }} K.
@@ -1232,7 +1251,7 @@ views:
             # error_reason est la DERNIÈRE erreur mémorisée, pas une erreur
             # active : il vaut 721 en permanence alors que la PAC va bien.
             # L'état de panne, c'est disturbance_output.
-            content: >-
+            content: |-
               **Pressions** — haute {{ states('sensor.luxtronik_300722_07_high_pressure') }} bar,
               basse {{ states('sensor.luxtronik_300722_07_low_pressure') }} bar.
               Elles s'équilibrent à l'arrêt : ne pas les lire comme un indicateur de santé.
