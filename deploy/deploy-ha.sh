@@ -56,42 +56,83 @@ fi
 
 # Remet les fichiers dans l'état d'avant le déploiement, et dit lesquels.
 # L'échec du retour en arrière est le pire cas : il laisse /config invalide.
-# Il se crie, il ne se tait pas — et « if ! » évite que set -e tue le script
-# avant que le message soit écrit.
+# Il se crie, il ne se tait pas — et la capture du ssh évite que set -e tue le
+# script avant que le message soit écrit.
 restaure() {
-  # set -eu, et non set -u : sans le -e, un mv en échec n'interromprait rien,
-  # « restauré » s'afficherait sur un fichier qui ne l'est pas, et le statut du
-  # fragment serait celui du rm -f final — donc 0 quoi qu'il arrive, ce qui
-  # rendrait le « if ! » ci-dessous toujours faux. Les conditions de if et de
-  # elif restent exemptées de -e, elles peuvent échouer sans tout arrêter.
-  if ! ssh "$HOST" "docker exec homeassistant sh -c '
-    set -eu
+  # Le fragment distant tourne sous « set -u » seul, sans -e, et c'est
+  # délibéré : avec -e, le premier mv refusé emporterait la boucle entière et
+  # les fichiers suivants — dont la sauvegarde est pourtant saine — ne
+  # seraient jamais remis en place. /config sortirait plus abîmé que sans
+  # retour en arrière du tout. Chaque mv et chaque rm est donc jugé sur place
+  # par un if, la boucle va au bout, et c'est le test final « [ $ECHEC = 0 ] »
+  # qui porte l'échec. Ce test est la dernière commande exprès : le statut ne
+  # doit pas être celui du « rm -f » du témoin, dont l'échec ne dit rien de la
+  # restauration.
+  #
+  # La sortie est capturée parce que le fragment est seul à savoir quelles
+  # sauvegardes restent en place : le message de détresse ne doit nommer que
+  # celles-là, jamais un .bak qu'un mv réussi a déjà consommé.
+  if SORTIE_R=$(ssh "$HOST" "docker exec homeassistant sh -c '
+    set -u
+    ECHEC=0
     N=0
     for f in $SAUVES; do
       if [ -f /config/\$f.bak-$STAMP ]; then
-        mv /config/\$f.bak-$STAMP /config/\$f
-        echo \"restauré : /config/\$f\"
-        N=\$((N+1))
+        if mv /config/\$f.bak-$STAMP /config/\$f; then
+          echo \"restauré : /config/\$f\"
+          N=\$((N+1))
+        else
+          ECHEC=1
+          echo \"ÉCHEC : /config/\$f non restauré\" >&2
+        fi
       # Le témoin ne garde que cette branche-ci, jamais la boucle entière : une
       # sauvegarde déjà écrite se remet en place même si le témoin a disparu.
       # Il ne sert qu à distinguer « ce fichier était absent avant ce
       # déploiement, je le retire » de « la sauvegarde n a jamais tourné, je ne
       # touche à rien » — sans quoi on supprimerait un fichier valide.
       elif [ -f $ABSENTS ] && grep -qx \"\$f\" $ABSENTS; then
-        rm -f /config/\$f
-        echo \"retiré : /config/\$f, absent avant ce déploiement\"
-        N=\$((N+1))
+        if rm -f /config/\$f; then
+          echo \"retiré : /config/\$f, absent avant ce déploiement\"
+          N=\$((N+1))
+        else
+          ECHEC=1
+          echo \"ÉCHEC : /config/\$f toujours en place\" >&2
+        fi
       fi
     done
-    [ \"\$N\" -gt 0 ] || echo \"rien à restaurer : la sauvegarde n a pas eu lieu\"
-    rm -f $ABSENTS'"; then
-    echo "LE RETOUR EN ARRIÈRE A ÉCHOUÉ. /config contient peut-être une" >&2
-    echo "configuration invalide. La remettre à la main depuis :" >&2
-    for f in $SAUVES; do
-      echo "  /config/$f.bak-$STAMP" >&2
-    done
-    echo "avant tout redémarrage de Home Assistant." >&2
+    if [ \"\$ECHEC\" = 1 ]; then
+      RESTES=
+      for f in $SAUVES; do
+        if [ -f /config/\$f.bak-$STAMP ]; then
+          RESTES=\"\$RESTES /config/\$f.bak-$STAMP\"
+        fi
+      done
+      echo \"RESTES:\$RESTES\"
+    elif [ \"\$N\" = 0 ]; then
+      echo \"rien à restaurer : la sauvegarde n a pas eu lieu\"
+    fi
+    rm -f $ABSENTS
+    [ \"\$ECHEC\" = 0 ]'"); then
+    ECHEC_R=0
+  else
+    ECHEC_R=1
   fi
+  # « RESTES: » s'adresse à ce script, pas à l'opérateur : on le lui épargne
+  # ici et on le relit plus bas.
+  if [ -n "$SORTIE_R" ]; then
+    echo "$SORTIE_R" | grep -v '^RESTES:' || true
+  fi
+  if [ "$ECHEC_R" = 0 ]; then return 0; fi
+  echo "LE RETOUR EN ARRIÈRE A ÉCHOUÉ. /config contient peut-être une" >&2
+  echo "configuration invalide. La remettre à la main depuis :" >&2
+  RESTES=$(echo "$SORTIE_R" | sed -n 's/^RESTES://p')
+  # Liste vide : le fragment n'a pas pu parler (ssh ou docker exec en échec),
+  # donc aucun mv n'a eu lieu et toutes les sauvegardes sont encore là.
+  if [ -z "$RESTES" ]; then
+    for f in $SAUVES; do RESTES="$RESTES /config/$f.bak-$STAMP"; done
+  fi
+  for b in $RESTES; do echo "  $b" >&2; done
+  echo "avant tout redémarrage de Home Assistant." >&2
 }
 
 # La sortie du ssh est capturée pour être relue : check_config sort en 0 même
