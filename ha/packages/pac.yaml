@@ -26,6 +26,14 @@ template:
         minutes: "/1"
       - trigger: homeassistant
         event: start
+      # Un capteur à déclencheurs n'a pas d'état avant son premier
+      # déclenchement. Or « homeassistant start » ne part PAS sur un
+      # reload_all : sans cette ligne, la durée reste « unknown » jusqu'au
+      # time_pattern suivant — jusqu'à une minute de trou, à l'endroit le
+      # plus visible du tableau, après chaque rechargement de la
+      # configuration YAML.
+      - trigger: event
+        event_type: event_template_reloaded
     sensor:
       - name: "PAC depuis"
         unique_id: pac_depuis
