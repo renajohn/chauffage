@@ -160,10 +160,11 @@ C'est `packages/ecs_solaire.yaml` qui la déplace.
 |---|---|---|
 | `sensor.pac_ecart_chauffage` | départ − retour | compresseur en marche |
 | `sensor.pac_ecart_source` | saumure entrée − sortie | compresseur en marche |
-| `sensor.pac_cop_instant` | puissance thermique ÷ puissance électrique | consommation > 100 W |
-| `sensor.pac_cop_ecs` | `dhw_heat_amount` ÷ `dhw_energy_input` | toujours — vaut 3,64 |
-| `sensor.pac_cop_chauffage` | `heat_amount_heating` ÷ `heat_energy_input` | `heat_amount_heating` > 0 |
+| `sensor.pac_rendement_instantane` | puissance thermique ÷ puissance électrique | consommation > 100 W |
+| `sensor.pac_rendement_eau_chaude` | `dhw_heat_amount` ÷ `dhw_energy_input` | toujours — vaut 3,64 |
+| `sensor.pac_rendement_chauffage` | `heat_amount_heating` ÷ `heat_energy_input` | `heat_amount_heating` > 0 |
 | `sensor.pac_cycle_moyen` | heures × 60 ÷ démarrages | démarrages ≥ 10 |
+| `sensor.pac_temperature_du_sol` | saumure venant du forage | débit de saumure > 0 |
 
 Chacun porte un attribut `verdict` : une phrase en français plutôt qu'un nombre nu.
 
@@ -171,6 +172,21 @@ Chacun porte un attribut `verdict` : une phrase en français plutôt qu'un nombr
 `availability:` sur le gabarit. Ce n'est pas de la prudence décorative : relevé du
 22 septembre, tout le circuit est équilibré à 24 °C, saumure comprise, et l'écart source
 vaut −0,1 K. Un verdict là-dessus serait un mensonge.
+
+**La température du sol se tait elle aussi, et cette conception disait le contraire.**
+Elle affirmait plus bas que ce capteur « reste valable à l'arrêt : c'est une température,
+pas un écart ». L'argument est faux, et le propriétaire l'a mis en doute le premier. Mesuré
+le 22 septembre : à l'arrêt les deux sondes de saumure lisent ~23,8 °C — la température du
+local technique, pas celle du forage. La lecture s'effondre à 13,6 °C à la seconde où la
+pompe démarre, descend à 12,8 °C en quarante minutes de marche parce que le forage se
+refroidit à mesure qu'on lui prend sa chaleur, puis remonte à 16,8 °C une fois la pompe
+arrêtée. Le capteur annonçait « Tiède : le terrain s'est rechargé, typique de l'été » sur une
+lecture de local technique.
+
+Sa condition de disponibilité porte sur le **débit de saumure**
+(`heat_source_flow_rate`, 0 L/h à l'arrêt contre 2000–2200 L/h en marche) et non sur le
+compresseur : c'est une mesure directe de circulation, qui couvre aussi le rafraîchissement
+passif où la pompe tourne sans compresseur.
 
 ### Les seuils
 
