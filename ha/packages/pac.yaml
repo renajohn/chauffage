@@ -110,6 +110,33 @@ template:
           {% elif statut == 'no_request' %}Au-dessus de la limite de chauffe
           {% else %}Au repos{% endif %}
 
+      - name: "PAC explication"
+        unique_id: pac_explication
+        icon: mdi:text-long
+        # La régulation Alpha Innotec pilote sur le RETOUR, ce qui rend la
+        # chaîne de causalité lisible : consigne de retour contre retour réel.
+        # Quand ecs_solaire a relevé la consigne du ballon, la phrase le dit —
+        # sinon une consigne à 55 °C au lieu de 54 paraîtrait inexpliquée.
+        state: >-
+          {% set lux = 'luxtronik_300722_07_' %}
+          {% set ext = states('sensor.' ~ lux ~ 'outdoor_temperature') | float(0) | round(1) %}
+          {% set depart = states('sensor.' ~ lux ~ 'flow_in_temperature') | float(0) | round(1) %}
+          {% set retour = states('sensor.' ~ lux ~ 'flow_out_temperature') | float(0) | round(1) %}
+          {% set cible = states('sensor.' ~ lux ~ 'flow_out_temperature_target') | float(0) | round(1) %}
+          {% set ballon = states('sensor.' ~ lux ~ 'dhw_temperature') | float(0) | round(1) %}
+          {% set consigne = states('number.' ~ lux ~ 'dhw_target_temperature') | float(0) | round(0) | int %}
+          {% set boost = is_state('input_boolean.ecs_solaire_boost_actif', 'on') %}
+          {% set etat = states('sensor.pac_etat') %}
+          {% if etat == 'Hors ligne' %}La pompe à chaleur ne répond plus. Les valeurs affichées datent de sa dernière réponse.
+          {% elif etat == 'Erreur' %}La pompe à chaleur signale un défaut. Code de la dernière erreur : {{ states('sensor.' ~ lux ~ 'error_reason') }}.
+          {% elif etat == 'Bloquée par le réseau' %}Le fournisseur d'électricité a coupé l'autorisation de marche. La PAC reprendra d'elle-même.
+          {% elif etat == 'Fait l\'eau chaude' %}Le ballon est à {{ ballon }} °C, la consigne est {{ consigne }} °C{% if boost %} — relevée pour absorber le surplus solaire{% endif %}. La PAC charge l'eau chaude ; le chauffage reprendra ensuite.
+          {% elif etat == 'Chauffe la maison' %}Il fait {{ ext }} °C dehors. La courbe vise {{ cible }} °C au retour ; le retour est à {{ retour }} °C, le départ à {{ depart }} °C. Le compresseur tourne pour combler l'écart.
+          {% elif etat == 'Dégivre' %}La PAC dégivre son échangeur. C'est passager.
+          {% elif etat == 'Rafraîchit' %}La PAC envoie la fraîcheur du sol dans le plancher. Départ {{ depart }} °C, retour {{ retour }} °C.
+          {% elif etat == 'Au-dessus de la limite de chauffe' %}Il fait {{ ext }} °C dehors, au-dessus de la limite de chauffe : la PAC ne demande rien. Le plancher est à {{ retour }} °C au retour.
+          {% else %}Rien ne tourne. Il fait {{ ext }} °C dehors, le retour du plancher est à {{ retour }} °C.{% endif %}
+
       - name: "PAC température du sol"
         unique_id: pac_temperature_du_sol
         unit_of_measurement: "°C"
