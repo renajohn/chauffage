@@ -16,6 +16,39 @@
 # temperature_supply 24,0 (= flow_in) et temperature_return 23,5 (= flow_out).
 
 template:
+  # La durée dans l'état courant doit avancer toute seule, minute après
+  # minute. Un capteur d'état ne se recalcule qu'au changement de ses
+  # sources : il faut donc un déclencheur horaire.
+  - triggers:
+      - trigger: state
+        entity_id: sensor.pac_etat
+      - trigger: time_pattern
+        minutes: "/1"
+      - trigger: homeassistant
+        event: start
+    sensor:
+      - name: "PAC depuis"
+        unique_id: pac_depuis
+        icon: mdi:timer-sand
+        # relative_time() rend l'anglais (« 14 hours »), ce qui jure dans une
+        # interface française : la durée est formatée à la main, comme
+        # duree_fr() dans gen_maison.py.
+        #
+        # states.sensor.pac_etat est gardé dans une variable et testé avant
+        # qu'on touche à .last_changed : au tout premier déploiement, et
+        # pendant un redémarrage de Home Assistant, l'entité n'existe pas
+        # encore et l'expression vaut none. On retombe alors sur 0 seconde,
+        # donc « moins d'une minute », plutôt que sur un capteur unknown.
+        state: >-
+          {% set s = states.sensor.pac_etat %}
+          {% set d = ((as_timestamp(now())
+             - as_timestamp(s.last_changed, as_timestamp(now()))) | int)
+             if s is not none else 0 %}
+          {% if d < 60 %}moins d'une minute
+          {% elif d < 5400 %}{{ (d / 60) | round(0) | int }} min
+          {% elif d < 172800 %}{{ (d / 3600) | round(0) | int }} h
+          {% else %}{{ (d / 86400) | round(0) | int }} j{% endif %}
+
   - sensor:
       # Règle du paquet : le libellé français se lit en entier, et l'unique_id
       # n'est que son slug. Home Assistant fabrique l'identifiant d'entité à
@@ -23,6 +56,44 @@ template:
       # refusé par le domaine template (vérifié en 2026.9.3) : écrire ici un
       # unique_id qui ne slugifie pas le libellé fabriquerait une entité au
       # nom inattendu, que les tableaux référenceraient dans le vide.
+      - name: "PAC état"
+        unique_id: pac_etat
+        # L'icône suit une règle plus courte que l'état : la dupliquer en
+        # entier n'apporterait rien.
+        icon: >-
+          {% set lux = 'luxtronik_300722_07_' %}
+          {% if not has_value('sensor.' ~ lux ~ 'status') %}mdi:lan-disconnect
+          {% elif is_state('binary_sensor.' ~ lux ~ 'disturbance_output', 'on') %}mdi:alert-circle
+          {% elif is_state('binary_sensor.' ~ lux ~ 'defrost_valve', 'on') %}mdi:snowflake-melt
+          {% elif is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}mdi:water-boiler
+          {% elif is_state('binary_sensor.' ~ lux ~ 'compressor', 'on') %}mdi:heat-wave
+          {% else %}mdi:sleep{% endif %}
+        # ÉTAT DE PANNE : disturbance_output, jamais error_reason. Ce dernier
+        # vaut 721 sans discontinuer depuis au moins 5 jours (relevé du
+        # 22.09.2026) alors que la PAC va bien : c'est la DERNIÈRE erreur
+        # mémorisée, pas une erreur active.
+        #
+        # « Au-dessus de la limite de chauffe » mérite d'être un état à part :
+        # c'est la réponse à « pourquoi elle ne chauffe pas ? » un jour doux.
+        # La PAC l'annonce elle-même — lecture directe du 22.09.2026 :
+        # « Heizgrenze (Soll 15 °C) ».
+        #
+        # La valeur 'cooling' de status n'a PAS été observée : sur les 5 jours
+        # précédant le 22.09.2026, status ne prend que 'no_request'. À
+        # confirmer au premier rafraîchissement.
+        state: >-
+          {% set lux = 'luxtronik_300722_07_' %}
+          {% set statut = states('sensor.' ~ lux ~ 'status') %}
+          {% if not has_value('sensor.' ~ lux ~ 'status') %}Hors ligne
+          {% elif is_state('binary_sensor.' ~ lux ~ 'disturbance_output', 'on') %}Erreur
+          {% elif is_state('binary_sensor.' ~ lux ~ 'defrost_valve', 'on') %}Dégivre
+          {% elif is_state('binary_sensor.' ~ lux ~ 'evu_unlocked', 'off') %}Bloquée par le réseau
+          {% elif is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}Fait l'eau chaude
+          {% elif statut == 'cooling' %}Rafraîchit
+          {% elif is_state('binary_sensor.' ~ lux ~ 'compressor', 'on') %}Chauffe la maison
+          {% elif statut == 'no_request' %}Au-dessus de la limite de chauffe
+          {% else %}Au repos{% endif %}
+
       - name: "PAC température du sol"
         unique_id: pac_temperature_du_sol
         unit_of_measurement: "°C"
