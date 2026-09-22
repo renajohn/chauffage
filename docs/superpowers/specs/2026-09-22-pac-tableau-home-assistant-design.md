@@ -162,7 +162,7 @@ C'est `packages/ecs_solaire.yaml` qui la déplace.
 | `sensor.pac_ecart_source` | saumure entrée − sortie | compresseur en marche |
 | `sensor.pac_rendement_instantane` | puissance thermique ÷ puissance électrique | consommation > 100 W |
 | `sensor.pac_rendement_eau_chaude` | `dhw_heat_amount` ÷ `dhw_energy_input` | `dhw_energy_input` > 0,1 kWh |
-| `sensor.pac_rendement_chauffage` | chaleur nette ÷ électricité nette, deux `utility_meter` à nous | électricité nette > 10 kWh |
+| `sensor.pac_rendement_chauffage` | chaleur nette ÷ électricité nette, deux `utility_meter` à nous | chaleur nette > 0,1 kWh **et** électricité nette > 10 kWh |
 | `sensor.pac_cycle_moyen` | heures × 60 ÷ démarrages | démarrages ≥ 10 |
 | `sensor.pac_temperature_du_forage` | saumure venant du forage | débit de saumure > 0 |
 
@@ -180,7 +180,7 @@ le 22 septembre : à l'arrêt les deux sondes de saumure lisent ~23,8 °C — la
 local technique, pas celle du forage. La lecture s'effondre à 13,6 °C à la seconde où la
 pompe démarre, descend à 12,8 °C en quarante minutes de marche parce que le forage se
 refroidit à mesure qu'on lui prend sa chaleur, puis remonte à 16,8 °C une fois la pompe
-arrêtée. Le capteur annonçait « Tiède : le terrain s'est rechargé, typique de l'été » sur une
+arrêtée. Le capteur annonçait « Tiède : le forage s'est rechargé, typique de l'été » sur une
 lecture de local technique.
 
 Sa condition de disponibilité porte sur le **débit de saumure**
