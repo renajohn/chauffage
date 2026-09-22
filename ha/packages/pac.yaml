@@ -17,14 +17,14 @@
 
 template:
   - sensor:
-      # Le nom dit « température sol » et non « du sol » : Home Assistant
-      # fabrique l'identifiant d'entité à partir du nom affiché, et « du »
-      # donnerait sensor.pac_temperature_du_sol. La règle du dépôt veut
-      # unique_id = identifiant d'entité sans le domaine, donc
-      # sensor.pac_temperature_sol. object_id, qui aurait permis de garder le
-      # « du », est refusé par le domaine template (vérifié en 2026.9.3).
-      - name: "PAC température sol"
-        unique_id: pac_temperature_sol
+      # Règle du paquet : le libellé français se lit en entier, et l'unique_id
+      # n'est que son slug. Home Assistant fabrique l'identifiant d'entité à
+      # partir du libellé affiché, jamais de l'unique_id, et object_id est
+      # refusé par le domaine template (vérifié en 2026.9.3) : écrire ici un
+      # unique_id qui ne slugifie pas le libellé fabriquerait une entité au
+      # nom inattendu, que les tableaux référenceraient dans le vide.
+      - name: "PAC température du sol"
+        unique_id: pac_temperature_du_sol
         unit_of_measurement: "°C"
         device_class: temperature
         state_class: measurement
