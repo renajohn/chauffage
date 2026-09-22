@@ -6,7 +6,28 @@
        Les teintes sont portées par le SVG lui-même et non héritées du thème :
        picture-elements sert cette image comme une image, elle ne suit pas le
        mode clair ou sombre. Elles sont donc choisies pour tenir sur les deux.
-       Repères de position en % : voir l'en-tête de la tâche 6 du plan. -->
+
+       REPÈRES DE POSITION, en % de la largeur et de la hauteur. Ils ne sont
+       pas décoratifs : chacun désigne un élément réellement dessiné, et la
+       carte y pose une valeur. Déplacer un trait ici, c'est déplacer la
+       valeur qui le nomme — les deux se relisent ensemble.
+
+         sol             12/67   bande libre en haut du bloc de terre
+         saumure retour  27/70   au-dessus du tuyau qui vient du sol (y=290)
+         saumure aller   27/90   sous le tuyau qui repart au sol (y=350)
+         PAC             50/50   entre le titre et le compresseur
+         gaz chaud       50/62   dans le cercle du compresseur
+         départ          68/38   au-dessus du tronc de départ (y=170)
+         retour          68/70   au-dessus du tuyau de retour (y=300),
+                                 à gauche de la dérivation
+         ballon          90/22   dans le ballon
+         plancher        90/85   bande libre en bas du plancher
+
+       Sens des fluides, mesuré le 22.09.2026 compresseur en marche : la
+       saumure revient du sol à 13,7 °C et y repart à 10,3 °C ; le départ
+       part à 49,2 °C et le retour revient à 46,6 °C. Le chaud et le froid
+       sont donc placés en conséquence, et le bleu pâle de la saumure qui
+       repart se lit comme le plus froid des deux. -->
   <defs>
     <marker id="fleche" viewBox="0 0 10 10" refX="8" refY="5"
             markerWidth="5" markerHeight="5" orient="auto-start-reverse">
@@ -27,18 +48,30 @@
   <path d="M300 350 H180" stroke="#38bdf8" stroke-width="5" fill="none"
         marker-end="url(#fleche)" opacity="0.7"/>
 
-  <!-- La pompe à chaleur -->
+  <!-- La pompe à chaleur. Le cercle du compresseur est creux exprès : c'est
+       lui qui accueille la température du gaz chaud, et le mot « compresseur »
+       est passé dessous pour lui laisser la place. -->
   <rect x="300" y="120" width="200" height="230" rx="14" fill="#1e293b"
         stroke="#475569" stroke-width="3"/>
   <text x="400" y="150" text-anchor="middle" font-family="sans-serif"
         font-size="16" fill="#e2e8f0">Pompe à chaleur</text>
   <circle cx="400" cy="250" r="34" fill="none" stroke="#f59e0b" stroke-width="4"/>
-  <text x="400" y="256" text-anchor="middle" font-family="sans-serif"
+  <text x="400" y="302" text-anchor="middle" font-family="sans-serif"
         font-size="13" fill="#f59e0b">compresseur</text>
 
-  <!-- Départ vers la maison, retour de la maison -->
-  <path d="M500 170 H660" stroke="#ef4444" stroke-width="5" fill="none"
+  <!-- Départ vers la maison : un tronc sort de la PAC, se sépare en x=600 —
+       une branche descend au plancher, l'autre monte au ballon. Le point
+       marque la dérivation : sans lui on lirait deux tuyaux qui se croisent.
+       Le plancher reçoit donc une flèche rouge, le ballon une autre, et le
+       retour bleu repart du plancher : trois flèches, pas deux du même côté. -->
+  <path d="M500 170 H600" stroke="#ef4444" stroke-width="5" fill="none"/>
+  <path d="M600 170 V276 H660" stroke="#ef4444" stroke-width="5" fill="none"
         marker-end="url(#fleche)"/>
+  <path d="M600 170 V105 H660" stroke="#ef4444" stroke-width="5" fill="none"
+        marker-end="url(#fleche)" opacity="0.85"/>
+  <circle cx="600" cy="170" r="7" fill="#ef4444"/>
+
+  <!-- Retour de la maison -->
   <path d="M660 300 H500" stroke="#60a5fa" stroke-width="5" fill="none"
         marker-end="url(#fleche)"/>
 
@@ -55,8 +88,4 @@
         stroke-width="4" fill="none" stroke-linecap="round" opacity="0.75"/>
   <text x="715" y="378" text-anchor="middle" font-family="sans-serif"
         font-size="15" fill="#94a3b8">Plancher</text>
-
-  <!-- Dérivation du départ vers le ballon -->
-  <path d="M600 170 V105 H660" stroke="#ef4444" stroke-width="5" fill="none"
-        marker-end="url(#fleche)" opacity="0.85"/>
 </svg>
