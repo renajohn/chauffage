@@ -131,6 +131,16 @@ def sensor_card(e, name, icon, color="teal"):
     return {"type": M + "entity-card", "entity": e, "name": name, "icon": icon, "icon_color": color,
             "layout": "horizontal", "grid_options": {"columns": 6, "rows": 1}}
 
+def porte_garage(e, name, icon):
+    """Porte de garage, avec la duree depuis laquelle elle est ouverte. La
+    meme carte sert dans la vue Maison et dans la section Garage : savoir
+    depuis combien de temps est tout l'interet d'une porte qu'on oublie."""
+    return {"type": M + "template-card", "entity": e, "icon": icon, "primary": name,
+            "secondary": (f"{{% if is_state('{e}', 'on') %}}Ouvert depuis " + duree_fr(f"states.{e}")
+                          + "{% else %}Fermé{% endif %}"),
+            "icon_color": t(f"'orange' if is_state('{e}', 'on') else 'grey'"),
+            "grid_options": {"columns": 6, "rows": 1}}
+
 def opening_chip(e, name):
     return {"type": "template", "entity": e, "icon": t(f"'mdi:window-open-variant' if is_state('{e}', 'on') else 'mdi:window-closed-variant'"),
             "icon_color": t(f"'orange' if is_state('{e}', 'on') else 'grey'"),
@@ -147,17 +157,18 @@ def value_chip(e, icon, color, unit, digits=1):
             "content": f"{{{{ states('{e}') | float(0) | round({digits}) }}}} {unit}".replace(" | round(0) }}", " | round(0) | int }}"),
             "tap_action": {"action": "more-info"}}
 
-def room_section(r):
+def room_cards(r, chips=True):
+    """Les cartes d'une piece -- ou d'une zone, qui se decrit avec les memes
+    cles. `chips` a False supprime la rangee de puces sans toucher au reste."""
     cards = []
-    sub = temp_hum(r.get("temp"), r.get("hum"))
-    cards.append({"type": M + "title-card", "title": r["name"], "subtitle": sub, "alignment": "start"})
-    chips = []
-    if r.get("temp"): chips.append(value_chip(r["temp"], "mdi:thermometer", "red", "°C"))
-    if r.get("hum"): chips.append(value_chip(r["hum"], "mdi:water-percent", "blue", "%", 0))
-    for e, n, icon, color, unit, d in r.get("values", []): chips.append(value_chip(e, icon, color, unit, d))
-    for e, n in r.get("openings", []): chips.append(opening_chip(e, n))
-    for e in r.get("motion", []): chips.append(motion_chip(e))
-    if chips: cards.append({"type": M + "chips-card", "chips": chips, "alignment": "start"})
+    if chips:
+        ch = []
+        if r.get("temp"): ch.append(value_chip(r["temp"], "mdi:thermometer", "red", "°C"))
+        if r.get("hum"): ch.append(value_chip(r["hum"], "mdi:water-percent", "blue", "%", 0))
+        for e, n, icon, color, unit, d in r.get("values", []): ch.append(value_chip(e, icon, color, unit, d))
+        for e, n in r.get("openings", []): ch.append(opening_chip(e, n))
+        for e in r.get("motion", []): ch.append(motion_chip(e))
+        if ch: cards.append({"type": M + "chips-card", "chips": ch, "alignment": "start"})
     if r.get("main_light"): cards.append(light_card(r["main_light"][0], r["main_light"][1], main=True))
     for e, n in r.get("lights", []): cards.append(light_card(e, n))
     for c in r.get("covers", []): cards.append(cover_card(*c))
@@ -166,7 +177,48 @@ def room_section(r):
     for m in r.get("machines", []): cards.append(machine_card(*m))
     for s in r.get("sensors", []): cards.append(sensor_card(*s))
     cards += r.get("extra", [])
-    return {"type": "grid", "cards": cards}
+    return cards
+
+def zone_heading(z):
+    """Titre de second niveau, pour une zone a l'interieur d'une section.
+    `columns: full` n'est pas decoratif : une carte posee dans une section est
+    placee sur la grille interne de celle-ci et n'en occupe qu'une partie par
+    defaut -- un titre a mi-largeur ne se lirait pas comme un titre."""
+    return {"type": "heading", "heading": z["name"], "heading_style": "subtitle",
+            "icon": z.get("icon", "mdi:chevron-right"), "grid_options": {"columns": "full"}}
+
+def room_section(r):
+    sub = r.get("subtitle", temp_hum(r.get("temp"), r.get("hum")))
+    cards = [{"type": M + "title-card", "title": r["name"], "subtitle": sub, "alignment": "start"}]
+    # Une piece decoupee en zones ne porte pas de puces a son niveau : sa
+    # temperature et ses ouvrants sont ceux de ses zones, ou ils s'affichent
+    # deja. Les cles temp / hum / openings restent renseignees pour la tuile de
+    # navigation de la vue Maison, qui les lit sans passer par ici.
+    cards += room_cards(r, chips=not r.get("zones"))
+    for z in r.get("zones", []):
+        cards.append(zone_heading(z))
+        cards += room_cards(z)
+    # Une section occupe UNE case de la grille de la vue, et la ligne prend la
+    # hauteur de sa plus grande section (mesure au DOM le 22.09.2026 :
+    # grid-template-rows valait « 760px 641px » pour cinq sections sur trois
+    # colonnes). Une section courte laisse donc tout le reste de sa case en
+    # blanc, et un nombre de sections qui n'est pas un multiple du nombre de
+    # colonnes laisse une case entierement vide. `column_span` bouche ce trou.
+    n = r.get("column_span")
+    if not n:
+        return {"type": "grid", "cards": cards}
+    # MAIS la grille interne d'une section compte 12 colonnes PAR COLONNE DE
+    # VUE : meme mesure, une carte a `columns: 6` ne faisait plus que 190 px
+    # dans une section double de 776, soit 6/24. Sans cette mise a l'echelle,
+    # une section doublee n'occupe que sa moitie gauche et le blanc a seulement
+    # change de place.
+    mis = []
+    for c in cards:
+        go = c.get("grid_options")
+        if isinstance(go, dict) and isinstance(go.get("columns"), int):
+            c = {**c, "grid_options": {**go, "columns": min(12 * n, go["columns"] * n)}}
+        mis.append(c)
+    return {"type": "grid", "cards": mis, "column_span": n}
 
 # ----------------------------------------------------------------------------
 LUX = "sensor.luxtronik_300722_07_"
@@ -216,17 +268,9 @@ REZ = [
       motion=["binary_sensor.salle_de_bain_du_bas_salle_de_bain_du_bas_sdb_du_bas"],
       main_light=("light.salle_de_bain_du_bas_salle_de_bain_du_bas", "Salle de bain"),
       lights=[("light.douche_du_bas", "Douche"), ("light.wc_du_bas", "WC"), ("light.salle_de_bain_du_bas_wc_miroir", "Miroir WC")]),
- dict(id="buanderie", name="Buanderie", icon="mdi:washing-machine", temp=BUAND + "temperature", hum=BUAND + "humidity",
-      values=[(BUAND + "voc_index", "COV", "mdi:air-filter", "purple", "COV", 0), (BUAND + "pm2_5", "PM2.5", "mdi:blur", "grey", "µg/m³", 0)],
-      openings=[("binary_sensor.buanderie_porte", "Porte"), ("binary_sensor.fenetre_buanderie", "Fenêtre")],
-      main_light=("light.buanderie", "Buanderie"),
-      machines=[("binary_sensor.lave_linge_en_marche", "Lave-linge", "sensor.prise_machine_a_laver_power", "mdi:washing-machine"),
-                ("binary_sensor.seche_linge_en_marche", "Sèche-linge", "sensor.prise_seche_linge_power", "mdi:tumble-dryer")],
-      switches=[("switch.prise_desumidificateur", "Déshumidificateur", "sensor.prise_desumidificateur_power")]),
- dict(id="atelier", name="Atelier", icon="mdi:hammer-wrench", temp="sensor.atelier_temperature",
-      motion=["binary_sensor.atelier_motion"],
-      main_light=("light.atelier_atelier", "Atelier"),
-      switches=[("switch.prise_makita", "Chargeur Makita", "sensor.prise_makita_power")]),
+ # La buanderie et l'atelier ne sont plus ici : ils sont devenus deux zones de
+ # la section « Local technique », avec la cave entre eux, dans l'ordre ou on
+ # les traverse. Voir LOCAL_TECHNIQUE, dans la vue Technique.
 ]
 
 ETAGE = [
@@ -291,7 +335,105 @@ EXTERIEUR = [
               "show_state": False, "camera_view": "auto"}]),
 ]
 
+# ----------------------------------------------------------------------------
+# Le sous-sol se traverse dans un ordre : on entre par la buanderie, puis vient
+# la cave, puis l'atelier tout au fond. La section les redit dans cet ordre,
+# une zone chacun.
+#
+# `light.local_technique` la coiffe : c'est un groupe Hue qui contient
+# EXACTEMENT light.buanderie, light.cave et les trois spots de l'atelier
+# (releve du 22.09.2026). Les aires Home Assistant, elles, decoupent le local
+# en trois -- aire « local_technique » : light.cave seule ; aire « buanderie » :
+# light.buanderie ; aire « atelier » : les trois spots. Aucune ne recouvre la
+# piece telle qu'on la vit, le groupe Hue si : c'est donc lui qui sert au
+# comptage des lampes de la tuile de navigation (light_group ci-dessous), et
+# une lampe ajoutee a la zone Hue s'y comptera sans toucher a ce fichier.
+#
+# La carte du froid : le congelateur ET la cave a vin sont sur la MEME prise
+# (switch.prise_cave). Mesure sur 30 h le 22.09.2026, les paliers s'additionnent
+# proprement -- ~23 W (marche ~15 min toutes les ~25 min), ~56 W (~11 min par
+# heure), ~79 W les deux ensemble, et ~336 W pendant 12 min pour un degivrage.
+# On pourrait en deduire lequel tourne ; on ne le fait pas, une seule carte dit
+# la puissance totale. Elle prend 12 colonnes et non 6 : « Congélateur et cave
+# à vin » ne tient pas dans une demi-carte.
+CAVE_FROID = {"type": M + "template-card", "entity": "sensor.prise_cave_power", "icon": "mdi:fridge-outline",
+              "primary": "Congélateur et cave à vin",
+              "secondary": t("states('sensor.prise_cave_power') | float(0) | round(0) | int") + " W"
+                           + t("' · PRISE COUPÉE' if is_state('switch.prise_cave', 'off') else ''"),
+              "icon_color": t("'red' if is_state('switch.prise_cave', 'off') else 'cyan'"),
+              "tap_action": {"action": "more-info"}, "grid_options": {"columns": 12, "rows": 1}}
+
+LOCAL_TECHNIQUE = dict(
+    id="local", name="Local technique", short="Local technique", icon="mdi:home-thermometer-outline",
+    light_group="light.local_technique",
+    # Renseignes pour la tuile de la vue Maison seule : une piece a zones
+    # n'affiche pas de puces a son niveau.
+    temp=BUAND + "temperature", hum=BUAND + "humidity",
+    openings=[("binary_sensor.buanderie_porte", "Porte buanderie"),
+              ("binary_sensor.fenetre_buanderie", "Fenêtre buanderie"),
+              ("binary_sensor.fenetre_cave", "Fenêtre cave")],
+    subtitle=("Buanderie " + temp_hum(BUAND + "temperature", BUAND + "humidity")
+              + " · Atelier " + temp_hum("sensor.atelier_temperature")),
+    main_light=("light.local_technique", "Tout le local"),
+    zones=[
+     dict(name="Buanderie", icon="mdi:washing-machine",
+          values=[(BUAND + "voc_index", "COV", "mdi:air-filter", "purple", "COV", 0),
+                  (BUAND + "pm2_5", "PM2.5", "mdi:blur", "grey", "µg/m³", 0)],
+          openings=[("binary_sensor.buanderie_porte", "Porte"), ("binary_sensor.fenetre_buanderie", "Fenêtre")],
+          motion=["binary_sensor.buanderie_motion"],
+          lights=[("light.buanderie", "Buanderie")],
+          machines=[("binary_sensor.lave_linge_en_marche", "Lave-linge", "sensor.prise_machine_a_laver_power", "mdi:washing-machine"),
+                    ("binary_sensor.seche_linge_en_marche", "Sèche-linge", "sensor.prise_seche_linge_power", "mdi:tumble-dryer")],
+          switches=[("switch.prise_desumidificateur", "Déshumidificateur", "sensor.prise_desumidificateur_power")]),
+     dict(name="Cave", icon="mdi:bottle-wine-outline",
+          openings=[("binary_sensor.fenetre_cave", "Fenêtre")],
+          lights=[("light.cave", "Cave")],
+          extra=[CAVE_FROID]),
+     dict(name="Atelier", icon="mdi:hammer-wrench",
+          values=[("sensor.atelier_illuminance", "Lumière", "mdi:brightness-6", "amber", "lx", 0)],
+          motion=["binary_sensor.atelier_motion"],
+          # Le groupe des trois spots, pas les spots un a un : « Atelier spot 1,
+          # 2, 3 » ne se distinguent que par un chiffre. Appui long pour le
+          # detail.
+          lights=[("light.atelier_atelier", "Atelier")],
+          switches=[("switch.prise_makita", "Chargeur Makita", "sensor.prise_makita_power")]),
+    ])
+
+# Le garage n'est pas dans la sequence buanderie-cave-atelier : il a sa propre
+# section. Il n'a aucune lampe dans Home Assistant, d'ou nav_secondary : sans
+# lui sa tuile annoncerait « Éteint », ce qui ne renseigne sur rien.
+GARAGE_OUVERTES = ("[states('binary_sensor.garage_porte_gauche'), states('binary_sensor.garage_porte_droite')] "
+                   "| select('eq', 'on') | list | count")
+GARAGE = dict(
+    id="garage", name="Garage", icon="mdi:garage-variant", nav_badge_icon="mdi:garage-open-variant",
+    # Deux colonnes : avec Passerelles, la seconde ligne en compte alors trois
+    # et ne laisse plus de case orpheline.
+    column_span=2,
+    openings=[("binary_sensor.garage_porte_gauche", "Voiture"), ("binary_sensor.garage_porte_droite", "Vélo")],
+    nav_secondary=("{% set n = " + GARAGE_OUVERTES + " %}"
+                   "{{ 'Fermé' if n == 0 else n ~ ' porte' ~ ('s' if n > 1 else '') ~ ' ouverte' ~ ('s' if n > 1 else '') }}"),
+    extra=[porte_garage("binary_sensor.garage_porte_gauche", "Porte voiture", "mdi:garage-variant"),
+           porte_garage("binary_sensor.garage_porte_droite", "Porte vélo", "mdi:bicycle")])
+
+# zigbee2mqtt et la chaine Ring vivaient dans « Local technique et garage ».
+# Ce sont des services, pas des objets d'une piece : ils ont leur section.
+PASSERELLES = dict(
+    id="passerelles", name="Passerelles", icon="mdi:lan-connect",
+    extra=[sensor_card("binary_sensor.zigbee2mqtt_bridge_connection_state", "zigbee2mqtt", "mdi:zigbee", "green"),
+           sensor_card("binary_sensor.porch_ring_link", "Chaîne Ring", "mdi:doorbell-video", "green")])
+
+# L'ORDRE EST CELUI DES HAUTEURS, PAS CELUI DE L'IMPORTANCE. Mesure au DOM le
+# 22.09.2026 : Local technique 760 px, Solaire 641, PAC 456, Garage 174,
+# Passerelles 128. Une ligne prend la hauteur de sa plus grande section ; tant
+# que les deux plus hautes etaient sur des lignes differentes, chacune imposait
+# sa hauteur a deux petites -- 2044 px de blanc en tout, pour une vue de
+# 1425 px. Les trois grandes d'abord, donc, les deux petites ensuite : la vue
+# tombe a 958 px et le blanc a environ 470.
+# Local technique reste en tete : c'est la que mene la tuile « Sous-sol » de la
+# vue Maison, et sur telephone (une seule colonne) l'ordre des sections est
+# l'ordre de defilement.
 TECHNIQUE = [
+ LOCAL_TECHNIQUE,
  dict(id="pac", name="Pompe à chaleur", icon="mdi:heat-pump-outline",
       extra=[{"type": M + "template-card", "entity": "sensor.pac_etat", "icon": "mdi:heat-pump",
               "icon_color": t("'orange' if is_state('binary_sensor.luxtronik_300722_07_compressor', 'on') else 'blue-grey'"),
@@ -347,36 +489,42 @@ TECHNIQUE = [
              sensor_card("sensor.prise_rack_power", "Rack", "mdi:server", "indigo"),
              sensor_card("sensor.electricity_maps_co2_intensity", "CO₂ du réseau", "mdi:molecule-co2", "green"),
              {"type": "energy-distribution", "link_dashboard": True}]),
- dict(id="local", name="Local technique et garage", icon="mdi:garage-variant",
-      openings=[("binary_sensor.fenetre_cave", "Fenêtre cave"), ("binary_sensor.garage_porte_gauche", "Garage voiture"),
-                ("binary_sensor.garage_porte_droite", "Garage vélo")],
-      lights=[("light.local_technique", "Local technique")],
-      switches=[("switch.prise_cave", "Congélateur", "sensor.prise_cave_power")],
-      extra=[sensor_card("binary_sensor.zigbee2mqtt_bridge_connection_state", "zigbee2mqtt", "mdi:zigbee", "green"),
-             sensor_card("binary_sensor.porch_ring_link", "Chaîne Ring", "mdi:doorbell-video", "green")]),
+ GARAGE,
+ PASSERELLES,
 ]
 
 # ----------------------------------------------------------------------------
 def room_nav_card(r, path):
-    lights_on = (f"expand(area_entities('{r['id']}')) | selectattr('domain', 'eq', 'light') | selectattr('state', 'eq', 'on') "
-                 "| rejectattr('attributes.is_hue_group', 'defined') | list | count")
+    if r.get("light_group"):
+        # Piece qu'aucune aire Home Assistant ne recouvre : on compte les
+        # membres d'un groupe Hue. `or []` tient le compte a zero quand le
+        # groupe est indisponible, au lieu de casser le gabarit.
+        lights_on = (f"expand(state_attr('{r['light_group']}', 'entity_id') or []) "
+                     "| selectattr('state', 'eq', 'on') | list | count")
+    else:
+        lights_on = (f"expand(area_entities('{r['id']}')) | selectattr('domain', 'eq', 'light') | selectattr('state', 'eq', 'on') "
+                     "| rejectattr('attributes.is_hue_group', 'defined') | list | count")
     sec = []
     if r.get("temp"): sec.append(f"{{{{ (states('{r['temp']}') | float(0) | round(1)) if has_value('{r['temp']}') else '–' }}}} °C")
     if r.get("hum"): sec.append(f"{{{{ (states('{r['hum']}') | float(0) | round(0) | int) if has_value('{r['hum']}') else '–' }}}} %")
     secondary = " · ".join(sec) if sec else ""
     lamp = "" if sec else "{% set n = " + lights_on + " %}{{ n ~ ' lampe' ~ ('s' if n > 1) if n else 'Éteint' }}"
+    # Une piece sans lampe dans Home Assistant (le garage) annoncerait
+    # « Éteint », qui ne renseigne sur rien : nav_secondary dit autre chose.
+    if r.get("nav_secondary"): secondary, lamp = r["nav_secondary"], ""
     open_ids = [e for e, _ in r.get("openings", [])]
     badge = ""
     if open_ids:
         cond = " or ".join(f"is_state('{e}', 'on')" for e in open_ids)
-        badge = t(f"'mdi:window-open-variant' if ({cond}) else ''")
+        # Une porte de garage ouverte ne se dessine pas comme une fenetre.
+        badge = t(f"'{r.get('nav_badge_icon', 'mdi:window-open-variant')}' if ({cond}) else ''")
     return {"type": M + "template-card", "icon": r["icon"], "primary": r.get("short", r["name"]), "secondary": secondary + lamp,
             "icon_color": t(f"'amber' if ({lights_on}) > 0 else 'blue-grey'"),
             "badge_icon": badge, "badge_color": "orange", "layout": "vertical", "fill_container": True,
             "tap_action": {"action": "navigate", "navigation_path": path}, "grid_options": {"columns": 4, "rows": 2}}
 
 AREA_IDS = {"salon": "salon", "cuisine": "cuisine", "bureau": "bureau", "entree": "entree", "salle_de_bain_bas": "salle_de_bain_bas",
-            "buanderie": "buanderie", "atelier": "atelier", "chambre_parents": "chambre_parents", "chambre_alice": "chambre_alice",
+            "chambre_parents": "chambre_parents", "chambre_alice": "chambre_alice",
             "chambre_oriane": "chambre_oriane", "salle_de_bain_haut": "salle_de_bain_haut", "dressing": "dressing",
             "terrasse": "terrasse_principale", "entree_ext": "entree_exterieure"}
 
@@ -471,17 +619,10 @@ def overview():
         {"type": M + "title-card", "title": "En ce moment", "alignment": "start"},
         machine_card("binary_sensor.lave_linge_en_marche", "Lave-linge", "sensor.prise_machine_a_laver_power", "mdi:washing-machine"),
         machine_card("binary_sensor.seche_linge_en_marche", "Sèche-linge", "sensor.prise_seche_linge_power", "mdi:tumble-dryer"),
-        {"type": M + "template-card", "entity": "binary_sensor.garage_porte_gauche", "icon": "mdi:garage-variant", "primary": "Garage voiture",
-         "secondary": "{% if is_state('binary_sensor.garage_porte_gauche', 'on') %}Ouvert depuis " + duree_fr("states.binary_sensor.garage_porte_gauche") + "{% else %}Fermé{% endif %}",
-         "icon_color": t("'orange' if is_state('binary_sensor.garage_porte_gauche', 'on') else 'grey'"), "grid_options": {"columns": 6, "rows": 1}},
-        {"type": M + "template-card", "entity": "binary_sensor.garage_porte_droite", "icon": "mdi:bicycle", "primary": "Garage vélo",
-         "secondary": "{% if is_state('binary_sensor.garage_porte_droite', 'on') %}Ouvert depuis " + duree_fr("states.binary_sensor.garage_porte_droite") + "{% else %}Fermé{% endif %}",
-         "icon_color": t("'orange' if is_state('binary_sensor.garage_porte_droite', 'on') else 'grey'"), "grid_options": {"columns": 6, "rows": 1}},
-        {"type": M + "template-card", "entity": "sensor.prise_cave_power", "icon": "mdi:fridge-outline",
-         "primary": "Congélateur",
-         "secondary": t("states('sensor.prise_cave_power') | float(0) | round(0) | int") + " W" + t("' · PRISE COUPÉE' if is_state('switch.prise_cave', 'off') else ''"),
-         "icon_color": t("'red' if is_state('switch.prise_cave', 'off') else 'cyan'"),
-         "tap_action": {"action": "more-info"}, "grid_options": {"columns": 6, "rows": 1}},
+        porte_garage("binary_sensor.garage_porte_gauche", "Garage voiture", "mdi:garage-variant"),
+        porte_garage("binary_sensor.garage_porte_droite", "Garage vélo", "mdi:bicycle"),
+        # Plus de tuile « Congelateur » ici : le froid de la cave n'a rien a
+        # faire en premiere page. Il vit dans la zone Cave du local technique.
         {"type": M + "template-card", "entity": "cover.store_banne", "icon": "mdi:storefront-outline", "primary": "Store banne",
          "secondary": t("'Sorti' if is_state('cover.store_banne', 'open') else 'Rentré'"),
          "icon_color": t("'amber' if is_state('cover.store_banne', 'open') else 'grey'"),
@@ -491,7 +632,10 @@ def overview():
     return {"title": "Maison", "path": "maison", "icon": "mdi:home", "type": "sections", "max_columns": 3,
             "sections": [head, modes, rooms_section("Rez", [r for r in REZ], "/maison-pieces/rez"),
                          rooms_section("Étage", ETAGE, "/maison-pieces/etage"),
-                         rooms_section("Extérieur", [r for r in EXTERIEUR if r["id"] != "meteo"], "/maison-pieces/exterieur")]}
+                         rooms_section("Extérieur", [r for r in EXTERIEUR if r["id"] != "meteo"], "/maison-pieces/exterieur"),
+                         # Les deux menent a la vue Technique, ou elles sont les
+                         # deux premieres sections.
+                         rooms_section("Sous-sol", [LOCAL_TECHNIQUE, GARAGE], "/maison-pieces/technique")]}
 
 def floor_view(title, path, icon, rooms):
     return {"title": title, "path": path, "icon": icon, "type": "sections", "max_columns": 4,
@@ -659,6 +803,11 @@ HEADER = """# Tableau de bord « Maison » (Mushroom) — GENERE par gen_maison.
 # l'etat, puissance en sous-texte). La vue Maison : salutation, chips d'etat,
 # actions (modes, courbes, autres tableaux), une carte de navigation par piece
 # (icone ambre si une lampe est allumee, badge si un ouvrant est ouvert).
+#
+# Une piece peut se decouper en ZONES : un titre de second niveau par zone,
+# puis ses cartes, construites par les memes fabricants. Le « Local technique »
+# s'en sert pour dire buanderie, cave et atelier dans l'ordre ou on les
+# traverse. Voir LOCAL_TECHNIQUE dans le script.
 #
 # Cartes : Mushroom v5 (HACS piitaya/lovelace-mushroom, installe le
 # 2026-09-20), ressource /hacsfiles/lovelace-mushroom/mushroom.js. Fichier
