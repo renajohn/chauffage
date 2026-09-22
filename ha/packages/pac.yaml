@@ -80,7 +80,7 @@ template:
           {% elif is_state('binary_sensor.' ~ lux ~ 'disturbance_output', 'on') %}mdi:alert-circle
           {% elif is_state('binary_sensor.' ~ lux ~ 'defrost_valve', 'on') %}mdi:snowflake-melt
           {% elif is_state('binary_sensor.' ~ lux ~ 'evu_unlocked', 'off') %}mdi:transmission-tower-off
-          {% elif is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}mdi:water-boiler
+          {% elif statut == 'hot_water' or is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}mdi:water-boiler
           {% elif statut == 'cooling' %}mdi:snowflake
           {% elif is_state('binary_sensor.' ~ lux ~ 'compressor', 'on') %}mdi:heat-wave
           {% else %}mdi:sleep{% endif %}
@@ -104,7 +104,7 @@ template:
           {% elif is_state('binary_sensor.' ~ lux ~ 'disturbance_output', 'on') %}Erreur
           {% elif is_state('binary_sensor.' ~ lux ~ 'defrost_valve', 'on') %}Dégivre
           {% elif is_state('binary_sensor.' ~ lux ~ 'evu_unlocked', 'off') %}Bloquée par le réseau
-          {% elif is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}Fait l'eau chaude
+          {% elif statut == 'hot_water' or is_state('binary_sensor.' ~ lux ~ 'dhw_charging_pump', 'on') %}Fait l'eau chaude
           {% elif statut == 'cooling' %}Rafraîchit
           {% elif is_state('binary_sensor.' ~ lux ~ 'compressor', 'on') %}Chauffe la maison
           {% elif statut == 'no_request' %}Au-dessus de la limite de chauffe
