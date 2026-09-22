@@ -179,8 +179,21 @@ if [ "$CODE" -ne 0 ]; then
   restaure
   exit 1
 fi
-if echo "$SORTIE" | grep -q 'ERROR'; then
-  echo "check_config signale une erreur : retour en arrière, rien à recharger." >&2
+# check_config sort en 0 même quand il refuse la configuration, et il ne dit
+# pas « ERROR » dans tous les cas. Une faute de syntaxe YAML donne bien
+# « ERROR:annotatedyaml.loader: » et un code 1 ; mais un paquet qui ne se monte
+# pas — le mode d'échec le plus probable ici, une faute dans un gabarit —
+# donne « Incorrect config » et « Setup of package 'pac' failed », sans une
+# seule majuscule et sans code d'erreur (vérifié en 2026.9.3). Ce garde-fou
+# laissait passer ce cas-là : le script annonçait « OK. Recharger » sur une
+# configuration que Home Assistant venait de refuser, et le retour en arrière
+# ne partait pas. On cherche donc les trois formules, sans distinction de
+# casse. Un faux positif est bruyant mais sans dégât : il rend /config à
+# l'état d'avant, et il se voit. Un faux négatif laisse une configuration
+# invalide que le premier redémarrage venu lira.
+if echo "$SORTIE" | grep -qiE 'error|incorrect config|failed'; then
+  echo "check_config refuse la configuration : retour en arrière, rien à" >&2
+  echo "recharger. La raison est dans la sortie ci-dessus." >&2
   restaure
   exit 1
 fi
