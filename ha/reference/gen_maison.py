@@ -9,6 +9,7 @@ Regles :
 - tout template lit les etats avec un defaut : rien ne doit planter au
   demarrage quand une entite est encore indisponible.
 """
+import json
 import yaml
 
 M = "custom:mushroom-"
@@ -32,6 +33,38 @@ def duree_fr(ref):
             "{% elif d < 5400 %}{{ (d / 60) | round(0) | int }} min"
             "{% elif d < 172800 %}{{ (d / 3600) | round(0) | int }} h"
             "{% else %}{{ (d / 86400) | round(0) | int }} j{% endif %}")
+
+# Libelles courts de l'etat de la PAC, pour la tuile « PAC » de la vue Maison.
+# Cette tuile fait 4 colonnes sur 12 et son sous-texte est en nowrap +
+# text-overflow: ellipsis : mesure au DOM le 22.09.2026, il ne dispose que de
+# 102,6 px (section 371,7 px, colonne 23,63 px, gouttiere 8 px, donc carte
+# 4 col = 118,6 px, moins 2 x 8 px de marge interne), en Roboto 12 px avec
+# letter-spacing 0,4 px. « Au-dessus de la limite de chauffe » demande
+# 189,9 px et s'affichait « Au-dessus de la … » : la porte d'entree du
+# proprietaire vers le tableau PAC ne disait rien. Chaque forme courte
+# ci-dessous a ete mesuree dans ce meme span ; la plus longue, « Blocage
+# reseau », tient en 87,7 px, soit 15 px de marge. L'etat complet, lui, reste
+# lisible sur le tableau PAC (/pac-chauffage/pac) et en tete de la section
+# Technique, ou la carte est large.
+PAC_ETAT_COURT = {
+    "Hors ligne": "Hors ligne",                        # 58,2 px
+    "Erreur": "Erreur",                                # 34,3 px
+    "Dégivre": "Dégivre",                              # 42,8 px
+    "Bloquée par le réseau": "Blocage réseau",         # 87,7 px
+    "Fait l'eau chaude": "Eau chaude",                 # 66,1 px
+    "Rafraîchit": "Rafraîchit",                        # 55,1 px
+    "Chauffe la maison": "Chauffage",                  # 59,1 px
+    "Au-dessus de la limite de chauffe": "Trop doux",  # 57,0 px
+    "Au repos": "Au repos",                            # 50,6 px
+}
+
+def pac_etat_court(repli):
+    """Template rendant l'etat de la PAC en un libelle court. Le defaut de
+    .get() sert de repli : il couvre aussi bien un etat inattendu que
+    'unavailable' et 'unknown' quand le capteur n'a pas encore de valeur."""
+    return t(json.dumps(PAC_ETAT_COURT, ensure_ascii=False)
+             + ".get(states('sensor.pac_etat'), '" + repli + "')")
+
 
 def chip_entity(e, name=None, color=None):
     c = {"type": "entity", "entity": e}
@@ -266,8 +299,12 @@ TECHNIQUE = [
               "secondary": "Voir le tableau détaillé",
               "tap_action": {"action": "navigate", "navigation_path": "/pac-chauffage/pac"},
               "grid_options": {"columns": 12}},
+             # Plus de puce « Statut » : elle montrait l'enumeration brute du
+             # Luxtronik, « Idle (no request) », seul anglais d'un tableau
+             # francais. La traduire aurait redit mot pour mot le titre de la
+             # carte juste au-dessus, qui affiche deja sensor.pac_etat ; la
+             # puce est donc supprimee plutot que traduite.
              {"type": M + "chips-card", "alignment": "start", "chips": [
-                 chip_entity(LUX + "status", "Statut", "blue"),
                  # La puce ne s'affiche QUE compresseur en marche : a l'arret
                  # elle ne disait rien d'utile, et l'etat complet vit
                  # desormais dans le tableau PAC (/pac-chauffage/pac).
@@ -418,8 +455,9 @@ def overview():
          "icon_color": t("'orange' if is_state('binary_sensor.luxtronik_300722_07_compressor', 'on') else 'blue-grey'"),
          "primary": "PAC",
          # L'etat vivant plutot qu'un libelle fige : la tuile renseigne avant
-         # meme qu'on la touche.
-         "secondary": t("states('sensor.pac_etat') if has_value('sensor.pac_etat') else 'Tableau de la pompe a chaleur'"),
+         # meme qu'on la touche. Mais en version COURTE : la phrase entiere ne
+         # tient pas dans 4 colonnes, voir PAC_ETAT_COURT.
+         "secondary": pac_etat_court("Tableau PAC"),
          "layout": "vertical", "fill_container": True,
          "tap_action": {"action": "navigate", "navigation_path": "/pac-chauffage/pac"}, "grid_options": {"columns": 4, "rows": 2}},
     ]}
