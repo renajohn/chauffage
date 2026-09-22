@@ -25,6 +25,13 @@
 - **Jamais d'identité codée en dur.** Les tableaux sont partagés entre les comptes Renault et Violaine.
 - **Seuils en dur dans le YAML**, chacun suivi du raisonnement et de sa provenance en commentaire. Aucun `input_number`, donc aucune section à ajouter dans `reglages.yaml`.
 - **Français partout, accents compris**, y compris dans les commentaires YAML.
+- **Un `verdict` doit recalculer sa grandeur avec EXACTEMENT le même arrondi que le `state`
+  du capteur.** Sans cela le flottant les fait diverger : `17.4 - 15.4` vaut
+  `1.9999999999999982`, donc l'état affiche `2.0 K` pendant que le verdict, qui compare la
+  valeur brute à son seuil de 2, conclut « Très faible ». Constaté sur 192 combinaisons de
+  dixièmes dans la plage 15–40 °C, avec des lectures de sonde ordinaires. Tout banc d'essai qui
+  injecte une valeur déjà arrondie au lieu de repartir des lectures brutes est aveugle à ce
+  défaut.
 - **Les fichiers ne sont jamais édités sur p-cloud.** Source de vérité : ce dépôt. Déploiement par `deploy/deploy-ha.sh`.
 - **Sens des sondes, établi le 22.09.2026 :** `flow_in_temperature` = **départ** (Vorlauf), `flow_out_temperature` = **retour** (Rücklauf). Preuve : `flow_out_temperature_target` vaut 15,0 et correspond exactement à `temperature_target_return` lu en direct sur la PAC, or la régulation Alpha Innotec pilote sur le retour. Confirmé par la lecture directe : `temperature_supply` 24,0 = `flow_in`, `temperature_return` 23,5 = `flow_out`.
 - **État de panne :** `binary_sensor.…disturbance_output`, jamais `sensor.…error_reason`. Ce dernier vaut 721 sans discontinuer depuis au moins 5 jours alors que la PAC va bien : c'est la **dernière** erreur mémorisée, pas une erreur active.
@@ -606,7 +613,7 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC explication` 
           # 8 K, le débit est trop faible.
           verdict: >-
             {% set d = (states('sensor.luxtronik_300722_07_flow_in_temperature') | float(0)
-                        - states('sensor.luxtronik_300722_07_flow_out_temperature') | float(0)) %}
+                        - states('sensor.luxtronik_300722_07_flow_out_temperature') | float(0)) | round(1) %}
             {% if d < 2 %}Très faible : la circulation est rapide, ou la PAC module à vide.
             {% elif d <= 7 %}Normal pour un plancher chauffant.
             {% elif d <= 8 %}Un peu élevé : le débit commence à manquer.
@@ -629,7 +636,7 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC explication` 
           # faiblit, soit le terrain ne rend plus assez.
           verdict: >-
             {% set d = (states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0)
-                        - states('sensor.luxtronik_300722_07_heat_source_output_temperature') | float(0)) %}
+                        - states('sensor.luxtronik_300722_07_heat_source_output_temperature') | float(0)) | round(1) %}
             {% if d < 2 %}Faible : on prend peu de chaleur au terrain.
             {% elif d <= 5 %}Normal : le terrain rend bien.
             {% elif d <= 6 %}Un peu élevé : à surveiller.
@@ -647,7 +654,7 @@ Toujours dans `ha/packages/pac.yaml`, au capteur `PAC température du sol` exist
           # verdict-là reste valable à l'arrêt : c'est une température, pas un
           # écart.
           verdict: >-
-            {% set t = states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0) %}
+            {% set t = states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0) | round(1) %}
             {% if t < -5 %}Très froid : le terrain est sollicité au-delà de sa plage habituelle.
             {% elif t < 0 %}Froid, mais dans la plage d'une fin d'hiver.
             {% elif t < 15 %}Normal pour un terrain en saison de chauffe.
@@ -752,8 +759,8 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC écart source
               / states('sensor.luxtronik_300722_07_dhw_energy_input') | float(1)) | round(2) }}
         attributes:
           verdict: >-
-            {% set c = states('sensor.luxtronik_300722_07_dhw_heat_amount') | float(0)
-                       / states('sensor.luxtronik_300722_07_dhw_energy_input') | float(1) %}
+            {% set c = (states('sensor.luxtronik_300722_07_dhw_heat_amount') | float(0)
+                       / states('sensor.luxtronik_300722_07_dhw_energy_input') | float(1)) | round(2) %}
             {% if c >= 4 %}Très bon pour de l'eau chaude.
             {% elif c >= 3 %}Correct : chauffer à 54 °C coûte toujours plus que chauffer un plancher.
             {% else %}Faible : la PAC peine à monter le ballon.{% endif %}
@@ -776,8 +783,8 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC écart source
               / states('sensor.luxtronik_300722_07_heat_energy_input') | float(1)) | round(2) }}
         attributes:
           verdict: >-
-            {% set c = states('sensor.luxtronik_300722_07_heat_amount_heating') | float(0)
-                       / states('sensor.luxtronik_300722_07_heat_energy_input') | float(1) %}
+            {% set c = (states('sensor.luxtronik_300722_07_heat_amount_heating') | float(0)
+                       / states('sensor.luxtronik_300722_07_heat_energy_input') | float(1)) | round(2) %}
             {% if c >= 4.5 %}Excellent pour de la géothermie sur plancher.
             {% elif c >= 4 %}Bon.
             {% elif c >= 3 %}Moyen : la courbe de chauffe est peut-être trop haute.
@@ -798,8 +805,8 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC écart source
               / states('sensor.luxtronik_300722_07_current_power_consumption') | float(1)) | round(2) }}
         attributes:
           verdict: >-
-            {% set c = states('sensor.luxtronik_300722_07_current_heat_output') | float(0)
-                       / states('sensor.luxtronik_300722_07_current_power_consumption') | float(1) %}
+            {% set c = (states('sensor.luxtronik_300722_07_current_heat_output') | float(0)
+                       / states('sensor.luxtronik_300722_07_current_power_consumption') | float(1)) | round(2) %}
             {% if c >= 4 %}Bon rendement en ce moment.
             {% elif c >= 3 %}Rendement moyen en ce moment.
             {% else %}Rendement faible en ce moment.{% endif %}
@@ -820,8 +827,8 @@ Dans `ha/packages/pac.yaml`, sous le bloc `- sensor:`, après `PAC écart source
               / states('sensor.luxtronik_300722_07_compressor1_impulses') | int(1)) | round(0) | int }}
         attributes:
           verdict: >-
-            {% set m = states('sensor.luxtronik_300722_07_compressor1_operation_hours') | float(0) * 60
-                       / states('sensor.luxtronik_300722_07_compressor1_impulses') | int(1) %}
+            {% set m = (states('sensor.luxtronik_300722_07_compressor1_operation_hours') | float(0) * 60
+                       / states('sensor.luxtronik_300722_07_compressor1_impulses') | int(1)) | round(0) | int %}
             {% if m >= 20 %}Cycles longs : c'est sain pour le compresseur.
             {% elif m >= 10 %}Cycles acceptables.
             {% else %}Cycles courts : ils usent le compresseur.{% endif %}
