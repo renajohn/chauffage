@@ -46,7 +46,7 @@ rechargement de l'intégration :
 
 | Entité (préfixe `luxtronik_300722_07_`) | Relevé | Usage |
 |---|---|---|
-| `sensor…heat_source_input_temperature` | 23,9 °C | Saumure revenant du sol |
+| `sensor…heat_source_input_temperature` | 23,9 °C | Saumure revenant du forage |
 | `sensor…heat_source_output_temperature` | 24,0 °C | Saumure repartant au sol |
 | `sensor…compressor1_impulses` | 2 | Démarrages, pour le cycle moyen |
 | `sensor…outdoor_temperature_average` | 15,7 °C | Moyenne extérieure 24 h |
@@ -161,19 +161,19 @@ C'est `packages/ecs_solaire.yaml` qui la déplace.
 | `sensor.pac_ecart_chauffage` | départ − retour | compresseur en marche |
 | `sensor.pac_ecart_source` | saumure entrée − sortie | compresseur en marche |
 | `sensor.pac_rendement_instantane` | puissance thermique ÷ puissance électrique | consommation > 100 W |
-| `sensor.pac_rendement_eau_chaude` | `dhw_heat_amount` ÷ `dhw_energy_input` | toujours — vaut 3,64 |
-| `sensor.pac_rendement_chauffage` | `heat_amount_heating` ÷ `heat_energy_input` | `heat_amount_heating` > 0 |
+| `sensor.pac_rendement_eau_chaude` | `dhw_heat_amount` ÷ `dhw_energy_input` | `dhw_energy_input` > 0,1 kWh |
+| `sensor.pac_rendement_chauffage` | chaleur nette ÷ électricité nette, deux `utility_meter` à nous | électricité nette > 10 kWh |
 | `sensor.pac_cycle_moyen` | heures × 60 ÷ démarrages | démarrages ≥ 10 |
-| `sensor.pac_temperature_du_sol` | saumure venant du forage | débit de saumure > 0 |
+| `sensor.pac_temperature_du_forage` | saumure venant du forage | débit de saumure > 0 |
 
 Chacun porte un attribut `verdict` : une phrase en français plutôt qu'un nombre nu.
 
 **Les deux écarts passent en `unavailable` compresseur à l'arrêt**, par un
 `availability:` sur le gabarit. Ce n'est pas de la prudence décorative : relevé du
 22 septembre, tout le circuit est équilibré à 24 °C, saumure comprise, et l'écart source
-vaut −0,1 K. Un verdict là-dessus serait un mensonge.
+vaut 0,0 K. Un verdict là-dessus serait un mensonge.
 
-**La température du sol se tait elle aussi, et cette conception disait le contraire.**
+**La température du forage se tait elle aussi, et cette conception disait le contraire.**
 Elle affirmait plus bas que ce capteur « reste valable à l'arrêt : c'est une température,
 pas un écart ». L'argument est faux, et le propriétaire l'a mis en doute le premier. Mesuré
 le 22 septembre : à l'arrêt les deux sondes de saumure lisent ~23,8 °C — la température du
@@ -186,7 +186,23 @@ lecture de local technique.
 Sa condition de disponibilité porte sur le **débit de saumure**
 (`heat_source_flow_rate`, 0 L/h à l'arrêt contre 2000–2200 L/h en marche) et non sur le
 compresseur : c'est une mesure directe de circulation, qui couvre aussi le rafraîchissement
-passif où la pompe tourne sans compresseur.
+passif où la pompe tourne sans compresseur. **L'écart source, sur la même boucle, garde
+exprès le compresseur** : une température de forage se lit dès que le fluide circule, mais
+un écart source ne veut dire quelque chose que si la machine *prélève* de la chaleur. En
+rafraîchissement passif — 1797 h au compteur, ce mode n'est pas théorique — le transfert
+s'inverse et les seuils, écrits pour un prélèvement, annonceraient « on prend peu de chaleur
+au terrain » alors qu'on lui en donne. Deux gardes différentes sur la même boucle, et c'est
+délibéré ; le fichier le dit à l'endroit où un relecteur voudrait les harmoniser.
+
+**Le rendement chauffage ne lit pas les compteurs de la PAC.** `heat_energy_input` porte un
+résidu de 52,86 kWh (relevé du 22.09.2026, pour 0,00 kWh produit et 0 h de chauffage) : il
+n'a pas été remis à zéro avec les autres. Un offset au dénominateur ne se rattrape pas par
+un seuil de disponibilité — il ne fait que retarder la fausse annonce, et le chiffre publié
+le jour du déblocage vaut exactement le seuil choisi. Le paquet compte donc lui-même, par
+deux `utility_meter` (`sensor.pac_chauffage_chaleur_nette` et
+`sensor.pac_chauffage_electricite_nette`) qui ne retiennent que les *variations* de leurs
+sources : le résidu, acquis avant leur création, n'y entre jamais. Le détail du calcul et
+des variantes écartées est en tête de `packages/pac.yaml`.
 
 ### Les seuils
 
@@ -202,7 +218,7 @@ chauffe, et le commentaire dans le fichier le dira.
   PAC module à vide ; au-dessus de 8 K, le débit est trop faible.
 - **Écart source** : 2 à 5 K normal. Au-dessus de 6 K, soit le débit de saumure
   faiblit, soit le terrain ne rend plus assez.
-- **Température du sol** (saumure entrante) : au-dessus de 0 °C en saison de chauffe,
+- **Température du forage** (saumure entrante) : au-dessus de 0 °C en saison de chauffe,
   confortable ; sous −5 °C, le terrain est sollicité au-delà de sa plage habituelle.
 - **Cycle moyen** : au-delà de 20 min, sain ; de 10 à 20 min, acceptable ; sous 10 min,
   cycles courts, qui usent le compresseur.
@@ -360,7 +376,7 @@ porte un verdict.
 **Les deux écarts se mesurent.** Ils sont sortis de `unavailable` avec des valeurs
 plausibles : **2,6 K** côté chauffage, **3,4 K** côté source. L'écart source est
 **positif**, comme attendu d'une machine qui prélève de la chaleur au sol — à l'arrêt il
-valait −0,1 K, un simple décalage de sonde.
+valait 0,0 K, les sondes s'étant équilibrées.
 
 **C'est `status` qui fait foi pour l'eau chaude, pas la pompe de charge.** Pendant toute
 la charge, `sensor.…status` valait `hot_water` tandis que
@@ -370,7 +386,7 @@ conditions a été repris pour lire `status` d'abord. Le binaire reste au schém
 indicateur d'organe, il n'y décide de rien.
 
 **La température du forage se tait à bon droit.** À l'arrêt, les deux sondes de saumure
-lisent **~23,8 °C** — la température du local technique, pas celle du sol. Au démarrage
+lisent **~23,8 °C** — la température du local technique, pas celle du forage. Au démarrage
 de la pompe la lecture s'effondre à **13,6 °C**, descend à **12,8 °C** en quarante
 minutes, puis remonte à **16,8 °C** après l'arrêt. Le débit de saumure vaut **0 L/h** à
 l'arrêt et **2000 à 2200 L/h** en marche, sans valeur intermédiaire : le test de
@@ -389,12 +405,18 @@ un rafraîchissement sans compresseur a de bonnes raisons de ne rien produire �
 par la vanne de rafraîchissement ou par un écart inversé. À reprendre à la première
 journée chaude.
 
-**`heat_energy_input` porte un offset de 52,86 kWh.** Relevé le 22.09.2026 à 15 h :
-`heat_energy_input` = **52,86 kWh** pour un `heat_amount_heating` de **0,00 kWh** et
-**0 h** de chauffage depuis la remise à zéro. Ce compteur n'a pas été remis à zéro avec
-les autres. Le rendement chauffage se tait aujourd'hui, faute de chaleur produite ; le
-jour où il s'allumera, il sera **faussement bas** et le restera jusqu'à ce que la
-production rattrape l'offset. Cela se règle sur la PAC, pas dans Home Assistant.
+**`heat_energy_input` porte un offset de 52,86 kWh — contourné, pas guéri.** Relevé le
+22.09.2026 à 15 h : `heat_energy_input` = **52,86 kWh** pour un `heat_amount_heating` de
+**0,00 kWh** et **0 h** de chauffage depuis la remise à zéro. Ce compteur n'a pas été remis
+à zéro avec les autres, et cette conception a d'abord conclu que « cela se règle sur la PAC,
+pas dans Home Assistant » — en laissant donc le capteur s'allumer un jour sur un chiffre
+faux. C'était la même faute que sur le forage : un verdict confiant sur une lecture qui ne
+veut pas dire ce qu'elle a l'air de dire. Le rendement chauffage se calcule désormais sur
+deux `utility_meter` créés le 22.09.2026, qui ne comptent que les variations de leurs
+sources ; le résidu n'y entre pas. **Le compteur de la PAC, lui, reste sale** : toute
+lecture directe de `heat_energy_input` (une carte, un graphique, un futur capteur) porte
+encore ses 52,86 kWh. Une remise à zéro sur la machine reste souhaitable ; elle n'est plus
+nécessaire au tableau, et les deux compteurs à nous la traverseront sans broncher.
 
 **Les deux compteurs ECS ne progressent pas ensemble.** Échantillonnés toutes les 30 s
 pendant la charge, `dhw_heat_amount` est passé de 15,0 à 19,8 kWh tandis que
