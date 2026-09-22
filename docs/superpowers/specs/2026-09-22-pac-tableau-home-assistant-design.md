@@ -60,14 +60,37 @@ rechargement de l'intégration :
 Les deux sondes de saumure rendent exactement les valeurs lues en direct sur la PAC
 (23,9 / 24,0), ce qui confirme que l'intégration les lit correctement.
 
-## Trois réserves à tenir
+## Ce que les compteurs permettent, et ce qu'ils ne permettent pas
 
-**Le COP n'est pas vérifié.** `current_heat_output` et `current_power_consumption`
-lisent 0 W, mais le compresseur est à l'arrêt depuis 21 h. Rien ne prouve encore
-qu'elles renvoient de vraies valeurs en marche. Le capteur est construit, avec une
-condition de disponibilité qui exige une consommation supérieure à 100 W ; tant que la
-PAC n'a pas chauffé, il reste indisponible plutôt que d'afficher un rapport 0/0. **La
-validation du COP est une étape à part entière, à faire à la première chauffe.**
+**Le COP cumulé de l'eau chaude est mesurable ; l'instantané ne l'est pas encore.**
+Les compteurs ECS fonctionnent : `dhw_heat_amount` 15,0 kWh produits pour
+`dhw_energy_input` 4,12 kWh consommés sur 1,56 h de marche, soit **un COP de 3,64**.
+Cette estimation interne de la PAC est corroborée par une mesure indépendante :
+4,12 kWh sur 1,56 h font 2,64 kW de tirage moyen, en plein dans la fourchette
+« 2,4 kW au démarrage, 3,3 kW en fin de cycle » relevée les 20 et 21 septembre et
+consignée en tête de `packages/ecs_solaire.yaml`. Deux sources indépendantes qui
+concordent : l'estimation de la PAC est fiable.
+
+En revanche `current_heat_output` et `current_power_consumption` lisent 0 W, compresseur
+à l'arrêt depuis 21 h. Le COP **instantané** reste donc à vérifier à la première chauffe,
+et son capteur exige une consommation supérieure à 100 W pour se prononcer.
+
+**Les capteurs de COP de l'intégration sont inutilisables.** `sensor…cop_dhw` et
+`sensor…cop_heating` lisent tous deux `unknown` alors que leurs deux ingrédients sont
+présents et à jour : l'intégration ne fait pas le calcul. Les COP sont donc calculés
+dans les gabarits de ce paquet, jamais lus depuis ces deux entités.
+
+**Le COP de chauffage n'a pas encore de base saine.** `heat_amount_heating` vaut
+0 kWh et `operation_hours_heating` 0 h — la PAC n'a pas chauffé la maison depuis la
+remise à zéro — mais `heat_energy_input` affiche 52,86 kWh. Un compteur d'entrée qui
+tourne pour une sortie nulle est incohérent : celui-là n'a pas été remis à zéro avec
+les autres. Le capteur de COP chauffage est construit mais reste indisponible tant que
+`heat_amount_heating` est à 0, plutôt que d'annoncer un rendement de 0.
+
+**Aucun compteur électrique dédié à la PAC.** Les trois phases mesurées
+(`sensor.puissance_phase_a/b/c`) sont globales — buanderie, maison, cuisine. Elles ne
+peuvent pas isoler la PAC. L'estimation interne est la seule source, et la
+concordance ci-dessus suffit à s'y fier.
 
 **Le cycle moyen restera muet.** Deux démarrages et deux heures de marche : les
 compteurs ont été remis à zéro avec le nouveau système. L'indicateur exige au moins dix
@@ -127,13 +150,15 @@ Quand `input_boolean.ecs_solaire_boost_actif` est actif (son nom affiché est
 nomme la consigne haute — sinon la consigne à 55 °C au lieu de 54 paraîtrait inexpliquée.
 C'est `packages/ecs_solaire.yaml` qui la déplace.
 
-### Les quatre indicateurs
+### Les indicateurs
 
 | Capteur | Calcul | Disponible quand |
 |---|---|---|
 | `sensor.pac_ecart_chauffage` | départ − retour | compresseur en marche |
 | `sensor.pac_ecart_source` | saumure entrée − sortie | compresseur en marche |
-| `sensor.pac_cop` | puissance thermique ÷ puissance électrique | consommation > 100 W |
+| `sensor.pac_cop_instant` | puissance thermique ÷ puissance électrique | consommation > 100 W |
+| `sensor.pac_cop_ecs` | `dhw_heat_amount` ÷ `dhw_energy_input` | toujours — vaut 3,64 |
+| `sensor.pac_cop_chauffage` | `heat_amount_heating` ÷ `heat_energy_input` | `heat_amount_heating` > 0 |
 | `sensor.pac_cycle_moyen` | heures × 60 ÷ démarrages | démarrages ≥ 10 |
 
 Chacun porte un attribut `verdict` : une phrase en français plutôt qu'un nombre nu.
@@ -175,7 +200,7 @@ La vue se lit de haut en bas :
 1. **En ce moment** — carte `markdown` : l'état en gros, la durée, la phrase de
    causalité.
 2. **Le circuit** — carte `picture-elements` (voir ci-dessous).
-3. **Est-ce que ça va bien** — carte `entities` : les quatre indicateurs, chacun avec
+3. **Est-ce que ça va bien** — carte `entities` : les indicateurs, chacun avec
    son verdict. Les indisponibles disent pourquoi.
 4. **La courbe de chauffe** — les trois paramètres du circuit 2 (fin 35 °C, pied 20 °C,
    abaissement 0 K) et la consigne de retour courante. Le circuit 2 est le seul réel :
@@ -274,15 +299,19 @@ chaque rechargement de page.
 4. Le rendu vérifié au navigateur avec le MCP Chrome, en large et en largeur de
    téléphone — `check_config` ne valide pas les tableaux de bord, et la largeur des
    cartes se constate, elle ne se déduit pas.
-5. **À la première chauffe**, revenir vérifier le COP, les deux écarts et la phrase de
-   causalité en fonctionnement réel. Rien de tout cela n'est observable compresseur à
-   l'arrêt.
+5. Le COP ECS vérifié tout de suite contre le calcul à la main : 15,0 ÷ 4,12 = 3,64.
+6. **À la première chauffe**, revenir vérifier le COP instantané, les deux écarts et la
+   phrase de causalité en fonctionnement réel. Rien de tout cela n'est observable
+   compresseur à l'arrêt.
 
 ## Hors périmètre
 
 - Toute nouvelle automatisation de pilotage. `packages/ecs_solaire.yaml` garde la main
   sur la consigne ECS ; ce paquet observe, il ne décide pas.
 - Le sort du dépôt `chauffage`, à trancher plus tard.
+- Le **COP par cycle de charge ECS** — relever les deux compteurs au début et à la fin
+  de chaque chauffe pour mesurer ce que coûte le passage à 55 °C sur surplus solaire.
+  Utile vu `packages/ecs_solaire.yaml`, mais c'est un mécanisme à part : report assumé.
 - Les 45 entités Luxtronik encore désactivées, qui n'ont pas d'usage ici.
 - Une section dans `reglages.yaml` : elle n'a lieu d'être que si des helpers réglables
   apparaissent, et le choix des seuils en dur écarte ce cas.
