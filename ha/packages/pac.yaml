@@ -136,9 +136,16 @@ template:
         # La PAC l'annonce elle-même — lecture directe du 22.09.2026 :
         # « Heizgrenze (Soll 15 °C) ».
         #
-        # La valeur 'cooling' de status n'a PAS été observée : sur les 5 jours
-        # précédant le 22.09.2026, status ne prend que 'no_request'. À
-        # confirmer au premier rafraîchissement.
+        # L'ÉNUMÉRATION COMPLÈTE de status, lue le 22.09.2026 dans
+        # attributes.options du capteur en direct : heating, hot_water,
+        # swimming_pool_solar, evu, defrost, no_request,
+        # heating_external_source, cooling. Deux valeurs seulement ont été
+        # OBSERVÉES — 'no_request' à l'arrêt, et 'hot_water' pendant la charge
+        # du ballon du 22.09.2026 de 11 h 15 à 12 h 07. 'cooling' reste non
+        # observée, et pourrait ne jamais l'être si le rafraîchissement passif
+        # ne la produit pas : à confirmer à la première journée chaude.
+        # swimming_pool_solar et heating_external_source tombent au défaut,
+        # sans objet ici (ni piscine, ni appoint).
         state: >-
           {% set lux = 'luxtronik_300722_07_' %}
           {% set statut = states('sensor.' ~ lux ~ 'status') %}
@@ -159,6 +166,13 @@ template:
         # chaîne de causalité lisible : consigne de retour contre retour réel.
         # Quand ecs_solaire a relevé la consigne du ballon, la phrase le dit —
         # sinon une consigne à 55 °C au lieu de 54 paraîtrait inexpliquée.
+        #
+        # LA PREMIÈRE BRANCHE GARDE TOUTES LES AUTRES. Sans elle, un
+        # sensor.pac_etat à 'unknown' — l'état des quelques secondes qui
+        # suivent un redémarrage, avant que la cascade n'ait tourné — ne
+        # correspondait à aucun libellé et tombait au défaut : la phrase
+        # affirmait « Rien ne tourne. » alors que personne ne savait encore
+        # ce qui tournait. Une affirmation sur un état inconnu.
         state: >-
           {% set lux = 'luxtronik_300722_07_' %}
           {% set ext = states('sensor.' ~ lux ~ 'outdoor_temperature') | float(0) | round(1) %}
@@ -169,7 +183,8 @@ template:
           {% set consigne = states('number.' ~ lux ~ 'dhw_target_temperature') | float(0) | round(0) | int %}
           {% set boost = is_state('input_boolean.ecs_solaire_boost_actif', 'on') %}
           {% set etat = states('sensor.pac_etat') %}
-          {% if etat == 'Hors ligne' %}La pompe à chaleur ne répond plus. Les valeurs affichées datent de sa dernière réponse.
+          {% if not has_value('sensor.pac_etat') %}L'état de la pompe à chaleur n'est pas encore connu : Home Assistant vient de démarrer ou de recharger sa configuration.
+          {% elif etat == 'Hors ligne' %}La pompe à chaleur ne répond plus. Les valeurs affichées datent de sa dernière réponse.
           {% elif etat == 'Erreur' %}La pompe à chaleur signale un défaut. Code de la dernière erreur : {{ states('sensor.' ~ lux ~ 'error_reason') }}.
           {% elif etat == 'Bloquée par le réseau' %}Le fournisseur d'électricité a coupé l'autorisation de marche. La PAC reprendra d'elle-même.
           {% elif etat == 'Fait l\'eau chaude' %}Le ballon est à {{ ballon }} °C, la consigne est {{ consigne }} °C{% if boost %} — relevée pour absorber le surplus solaire{% endif %}. La PAC charge l'eau chaude ; le chauffage reprendra ensuite.
@@ -180,14 +195,19 @@ template:
           {% else %}Rien ne tourne. Il fait {{ ext }} °C dehors, le retour du plancher est à {{ retour }} °C.{% endif %}
 
       # LES DEUX ÉCARTS NE VEULENT RIEN DIRE COMPRESSEUR À L'ARRÊT : l'eau
-      # stagne et les sondes s'équilibrent. Relevé du 22.09.2026, tout le
-      # circuit à 24 °C, saumure comprise : l'écart source valait -0,1 K,
-      # physiquement impossible en marche. D'où l'availability.
+      # stagne et les sondes s'équilibrent. Relevé du 22.09.2026 à l'arrêt,
+      # tout le circuit à 24 °C, saumure comprise : l'écart source valait
+      # 0,0 K, physiquement impossible en marche. D'où l'availability.
+      #
+      # EN MARCHE, C'EST MESURÉ. Pendant la charge du ballon du 22.09.2026, de
+      # 11 h 15 à 12 h 07 : écart chauffage 2,6 K (départ 49,2, retour 46,6) et
+      # écart source 3,4 K, POSITIF — la machine prend bien de la chaleur au
+      # terrain. Les deux valeurs tombent dans les plages annoncées ci-dessous.
       #
       # SEUILS : valeurs de départ tirées de la littérature sur les planchers
-      # chauffants en géothermie, PAS de mesures sur cette installation — les
-      # compteurs ont été remis à zéro avec le nouveau système et rien n'a
-      # encore été observé en marche. À revoir après une saison de chauffe.
+      # chauffants en géothermie, PAS de mesures sur cette installation — cette
+      # unique chauffe de cinquante minutes, qui plus est une charge d'eau
+      # chaude, ne suffit pas à les asseoir. À revoir après une saison.
       - name: "PAC écart chauffage"
         unique_id: pac_ecart_chauffage
         unit_of_measurement: "K"
@@ -217,6 +237,17 @@ template:
         unit_of_measurement: "K"
         state_class: measurement
         icon: mdi:earth
+        # LE COMPRESSEUR ICI, LE DÉBIT DE SAUMURE POUR LA TEMPÉRATURE DU
+        # FORAGE : deux gardes différentes sur la même boucle, et c'est
+        # VOULU. Ne pas « harmoniser ». Une température de forage se lit dès
+        # que le fluide circule, compresseur ou non ; un écart source, lui,
+        # n'a de sens que si la machine PRÉLÈVE de la chaleur. En
+        # rafraîchissement passif la pompe de saumure tourne sans compresseur
+        # et le transfert s'inverse — l'écart deviendrait négatif et les
+        # seuils ci-dessous, écrits pour un prélèvement, annonceraient
+        # « Faible : on prend peu de chaleur au terrain » alors qu'on lui en
+        # DONNE. Ce mode n'est pas théorique : operation_hours_cooling vaut
+        # 1797 h au 22.09.2026.
         availability: >-
           {{ is_state('binary_sensor.luxtronik_300722_07_compressor', 'on')
              and has_value('sensor.luxtronik_300722_07_heat_source_input_temperature')
@@ -271,6 +302,10 @@ template:
         # avant au démarrage, une minute après à l'arrêt — en plus du
         # rafraîchissement passif, où elle tourne sans compresseur du tout. Un
         # guet sur le compresseur perdrait ces trois cas.
+        #
+        # CE RAISONNEMENT NE VAUT QUE POUR CE CAPTEUR-CI. L'écart source, sur
+        # la même boucle, garde exprès le compresseur : voir le commentaire
+        # posé au-dessus de son availability.
         availability: >-
           {{ states('sensor.luxtronik_300722_07_heat_source_flow_rate') | float(0) > 0
              and has_value('sensor.luxtronik_300722_07_heat_source_input_temperature') }}
@@ -397,9 +432,10 @@ template:
             {% else %}Rendement faible en ce moment.{% endif %}
 
       # Durée moyenne d'un cycle de compresseur. Exige dix démarrages : au
-      # 22.09.2026 il n'y en a eu que trois pour 1,64 h de marche, les
-      # compteurs ayant été remis à zéro avec le nouveau système. Une moyenne
-      # sur trois démarrages ne vaut rien.
+      # 22.09.2026 en fin de journée il n'y en a eu que trois, pour 2,4 h de
+      # marche (compressor1_operation_hours, relevé après la chauffe de
+      # 11 h 15 - 12 h 07), les compteurs ayant été remis à zéro avec le
+      # nouveau système. Une moyenne sur trois démarrages ne vaut rien.
       - name: "PAC cycle moyen"
         unique_id: pac_cycle_moyen
         unit_of_measurement: "min"

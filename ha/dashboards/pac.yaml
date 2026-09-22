@@ -252,82 +252,92 @@ views:
             heading: Est-ce que ça va bien
             heading_style: title
             icon: mdi:stethoscope
-          - type: custom:mushroom-template-card
+          # LES SEPT TUILES SONT LA MÊME CARTE. La première porte l'ancre
+          # &indicateur, les six autres la reprennent par « <<: *indicateur »
+          # — même idiome que les repères du schéma plus haut. Ce qui est
+          # partagé (le type de carte, la pleine largeur, le secondaire sur
+          # plusieurs lignes) n'est donc écrit qu'une fois.
+          #
+          # PIÈGE DE L'HÉRITAGE, à connaître avant de toucher à ces cartes :
+          # « entity », « icon », « icon_color », « primary » et « secondary »
+          # sont hérités eux aussi, et ne sont corrects que parce que CHAQUE
+          # carte les redéfinit toutes les cinq. En retirer une d'une carte ne
+          # provoquerait pas d'erreur : la carte afficherait silencieusement
+          # l'écart chauffage.
+          #
+          # CE QUE ÇA MET AU JOURNAL, pour qui l'y trouverait : chaque clé
+          # redéfinie après un « << » fait écrire à Home Assistant un
+          # avertissement « contains duplicate key », une trentaine ici. Ils
+          # sont attendus et sans effet — la carte rendue porte bien la valeur
+          # de la carte, pas celle de l'ancre (vérifié au rendu le
+          # 22.09.2026) — et le fichier en produisait déjà quatorze pour les
+          # repères du schéma. Ils ne sont écrits qu'à la lecture du fichier,
+          # pas à chaque affichage de la page.
+          #
+          # UNE RAISON PAR CONDITION, ET PAS UNE DE PLUS. Ces availability
+          # sont des conjonctions : « le compresseur est à l'arrêt » serait
+          # faux d'une sonde muette compresseur en marche. Chaque tuile
+          # distingue donc le cas ordinaire (rien ne tourne) du cas rare (une
+          # sonde ne répond pas), et ne dit que ce qu'elle a vérifié.
+          - &indicateur
+            type: custom:mushroom-template-card
             grid_options:
               columns: full
+            multiline_secondary: true
             entity: sensor.pac_ecart_chauffage
             icon: mdi:delta
             icon_color: "{{ 'blue' if has_value('sensor.pac_ecart_chauffage') else 'disabled' }}"
             primary: "Écart chauffage{% if has_value('sensor.pac_ecart_chauffage') %} — {{ states('sensor.pac_ecart_chauffage') }} K{% endif %}"
             secondary: >-
-              {% if has_value('sensor.pac_ecart_chauffage') %}{{ state_attr('sensor.pac_ecart_chauffage', 'verdict') }}{% else %}Non mesurable : le compresseur est à l'arrêt.{% endif %}
-            multiline_secondary: true
-          - type: custom:mushroom-template-card
-            grid_options:
-              columns: full
+              {% if has_value('sensor.pac_ecart_chauffage') %}{{ state_attr('sensor.pac_ecart_chauffage', 'verdict') }}{% elif not is_state('binary_sensor.luxtronik_300722_07_compressor', 'on') %}Non mesurable : le compresseur est à l'arrêt.{% else %}Non mesurable : la sonde de départ ou celle de retour ne répond pas.{% endif %}
+          - <<: *indicateur
             entity: sensor.pac_ecart_source
             icon: mdi:earth
             icon_color: "{{ 'blue' if has_value('sensor.pac_ecart_source') else 'disabled' }}"
             primary: "Écart source{% if has_value('sensor.pac_ecart_source') %} — {{ states('sensor.pac_ecart_source') }} K{% endif %}"
             secondary: >-
-              {% if has_value('sensor.pac_ecart_source') %}{{ state_attr('sensor.pac_ecart_source', 'verdict') }}{% else %}Non mesurable : le compresseur est à l'arrêt.{% endif %}
-            multiline_secondary: true
-          - type: custom:mushroom-template-card
-            grid_options:
-              columns: full
+              {% if has_value('sensor.pac_ecart_source') %}{{ state_attr('sensor.pac_ecart_source', 'verdict') }}{% elif not is_state('binary_sensor.luxtronik_300722_07_compressor', 'on') %}Non mesurable : le compresseur est à l'arrêt.{% else %}Non mesurable : une des deux sondes de saumure ne répond pas.{% endif %}
+          - <<: *indicateur
             entity: sensor.pac_temperature_du_forage
             icon: mdi:thermometer-water
             icon_color: "{{ 'blue' if has_value('sensor.pac_temperature_du_forage') else 'disabled' }}"
             primary: "Température du forage{% if has_value('sensor.pac_temperature_du_forage') %} — {{ states('sensor.pac_temperature_du_forage') }} °C{% endif %}"
             secondary: >-
-              {% if has_value('sensor.pac_temperature_du_forage') %}{{ state_attr('sensor.pac_temperature_du_forage', 'verdict') }}{% else %}Non mesurable : saumure à l'arrêt, les sondes lisent le local technique.{% endif %}
-            multiline_secondary: true
-          - type: custom:mushroom-template-card
-            grid_options:
-              columns: full
+              {% if has_value('sensor.pac_temperature_du_forage') %}{{ state_attr('sensor.pac_temperature_du_forage', 'verdict') }}{% elif states('sensor.luxtronik_300722_07_heat_source_flow_rate') | float(0) > 0 %}Non mesurable : la sonde de la saumure entrante ne répond pas.{% else %}Non mesurable : saumure à l'arrêt, les sondes lisent le local technique.{% endif %}
+          - <<: *indicateur
             entity: sensor.pac_rendement_eau_chaude
             icon: mdi:water-boiler
             icon_color: "{{ 'blue' if has_value('sensor.pac_rendement_eau_chaude') else 'disabled' }}"
             primary: "Rendement eau chaude{% if has_value('sensor.pac_rendement_eau_chaude') %} — {{ states('sensor.pac_rendement_eau_chaude') }}{% endif %}"
             secondary: >-
               {% if has_value('sensor.pac_rendement_eau_chaude') %}{{ state_attr('sensor.pac_rendement_eau_chaude', 'verdict') }}{% else %}Pas encore de chauffe mesurée.{% endif %}
-            multiline_secondary: true
           # LA RAISON NOMME LE COMPTEUR FAUTIF. Ce rendement ne se lit pas sur
           # les compteurs de la PAC : heat_energy_input affiche 52,86 kWh pour
           # 0 kWh produit, il n'a pas été remis à zéro avec les autres. Le
           # paquet compte donc lui-même, par deux utility_meter, et la tuile se
           # tait jusqu'à ce qu'il y ait de quoi se prononcer. Sans cette
           # phrase, un tableau muet passerait pour un tableau en panne.
-          - type: custom:mushroom-template-card
-            grid_options:
-              columns: full
+          - <<: *indicateur
             entity: sensor.pac_rendement_chauffage
             icon: mdi:radiator
             icon_color: "{{ 'blue' if has_value('sensor.pac_rendement_chauffage') else 'disabled' }}"
             primary: "Rendement chauffage{% if has_value('sensor.pac_rendement_chauffage') %} — {{ states('sensor.pac_rendement_chauffage') }}{% endif %}"
             secondary: >-
               {% if has_value('sensor.pac_rendement_chauffage') %}{{ state_attr('sensor.pac_rendement_chauffage', 'verdict') }}{% else %}Pas encore assez de chauffe mesurée. Le compteur d'entrée de la PAC n'a pas été remis à zéro (52,86 kWh pour 0 produit) : on compte nous-mêmes depuis le 22.09.2026.{% endif %}
-            multiline_secondary: true
-          - type: custom:mushroom-template-card
-            grid_options:
-              columns: full
+          - <<: *indicateur
             entity: sensor.pac_rendement_instantane
             icon: mdi:speedometer
             icon_color: "{{ 'blue' if has_value('sensor.pac_rendement_instantane') else 'disabled' }}"
             primary: "Rendement instantané{% if has_value('sensor.pac_rendement_instantane') %} — {{ states('sensor.pac_rendement_instantane') }}{% endif %}"
             secondary: >-
-              {% if has_value('sensor.pac_rendement_instantane') %}{{ state_attr('sensor.pac_rendement_instantane', 'verdict') }}{% else %}Le compresseur est à l'arrêt.{% endif %}
-            multiline_secondary: true
-          - type: custom:mushroom-template-card
-            grid_options:
-              columns: full
+              {% if has_value('sensor.pac_rendement_instantane') %}{{ state_attr('sensor.pac_rendement_instantane', 'verdict') }}{% elif is_state('binary_sensor.luxtronik_300722_07_compressor', 'on') %}La PAC démarre à peine : moins de 100 W tirés, il n'y a rien à diviser.{% else %}Le compresseur est à l'arrêt.{% endif %}
+          - <<: *indicateur
             entity: sensor.pac_cycle_moyen
             icon: mdi:restart
             icon_color: "{{ 'blue' if has_value('sensor.pac_cycle_moyen') else 'disabled' }}"
             primary: "Cycle moyen{% if has_value('sensor.pac_cycle_moyen') %} — {{ states('sensor.pac_cycle_moyen') }} min{% endif %}"
             secondary: >-
               {% if has_value('sensor.pac_cycle_moyen') %}{{ state_attr('sensor.pac_cycle_moyen', 'verdict') }}{% else %}Pas assez de démarrages pour se prononcer.{% endif %}
-            multiline_secondary: true
           - type: heading
             heading: Pressions et défauts
             heading_style: subtitle
