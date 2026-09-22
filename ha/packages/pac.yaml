@@ -47,6 +47,14 @@
 #   - CE QU'ILS NE PEUVENT PAS FAIRE : ce qui est produit pendant que Home
 #     Assistant est arrêté leur échappe. Les deux le perdent ensemble, donc le
 #     rapport reste juste ; ce sont les totaux qui sous-estiment.
+#
+# AVANT LA PREMIÈRE CHAUFFE, LES DEUX SONT « unknown », ET C'EST NORMAL : un
+# utility_meter n'a pas d'état tant que sa source n'a pas varié, et ni
+# heat_amount_heating ni heat_energy_input ne bougent, la PAC ne chauffant pas
+# la maison. Ce n'est pas une panne, et rien n'est perdu : vérifié le
+# 22.09.2026 sur un compteur jumeau créé exprès, source déjà à 52,86 kWh et
+# compteur à « unknown », la PREMIÈRE variation 52,86 -> 55,36 a été comptée
+# 2,50 — la variation, pas la valeur absolue, et pas zéro non plus.
 # Ne JAMAIS revenir à une lecture directe de heat_energy_input sans avoir
 # d'abord vérifié, sur la PAC, que ce compteur est reparti de zéro.
 utility_meter:
