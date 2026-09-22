@@ -59,25 +59,38 @@ fi
 # Il se crie, il ne se tait pas — et « if ! » évite que set -e tue le script
 # avant que le message soit écrit.
 restaure() {
+  # set -eu, et non set -u : sans le -e, un mv en échec n'interromprait rien,
+  # « restauré » s'afficherait sur un fichier qui ne l'est pas, et le statut du
+  # fragment serait celui du rm -f final — donc 0 quoi qu'il arrive, ce qui
+  # rendrait le « if ! » ci-dessous toujours faux. Les conditions de if et de
+  # elif restent exemptées de -e, elles peuvent échouer sans tout arrêter.
   if ! ssh "$HOST" "docker exec homeassistant sh -c '
-    set -u
-    if [ ! -f $ABSENTS ]; then
-      echo \"rien à restaurer : la sauvegarde n a pas eu lieu\"
-      exit 0
-    fi
+    set -eu
+    N=0
     for f in $SAUVES; do
       if [ -f /config/\$f.bak-$STAMP ]; then
         mv /config/\$f.bak-$STAMP /config/\$f
         echo \"restauré : /config/\$f\"
-      elif grep -qx \"\$f\" $ABSENTS; then
+        N=\$((N+1))
+      # Le témoin ne garde que cette branche-ci, jamais la boucle entière : une
+      # sauvegarde déjà écrite se remet en place même si le témoin a disparu.
+      # Il ne sert qu à distinguer « ce fichier était absent avant ce
+      # déploiement, je le retire » de « la sauvegarde n a jamais tourné, je ne
+      # touche à rien » — sans quoi on supprimerait un fichier valide.
+      elif [ -f $ABSENTS ] && grep -qx \"\$f\" $ABSENTS; then
         rm -f /config/\$f
         echo \"retiré : /config/\$f, absent avant ce déploiement\"
+        N=\$((N+1))
       fi
     done
+    [ \"\$N\" -gt 0 ] || echo \"rien à restaurer : la sauvegarde n a pas eu lieu\"
     rm -f $ABSENTS'"; then
     echo "LE RETOUR EN ARRIÈRE A ÉCHOUÉ. /config contient peut-être une" >&2
-    echo "configuration invalide : la remettre à la main depuis les copies" >&2
-    echo "/config/*.bak-$STAMP avant tout redémarrage de Home Assistant." >&2
+    echo "configuration invalide. La remettre à la main depuis :" >&2
+    for f in $SAUVES; do
+      echo "  /config/$f.bak-$STAMP" >&2
+    done
+    echo "avant tout redémarrage de Home Assistant." >&2
   fi
 }
 
