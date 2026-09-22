@@ -137,6 +137,62 @@ template:
           {% elif etat == 'Au-dessus de la limite de chauffe' %}Il fait {{ ext }} °C dehors, au-dessus de la limite de chauffe : la PAC ne demande rien. Le plancher est à {{ retour }} °C au retour.
           {% else %}Rien ne tourne. Il fait {{ ext }} °C dehors, le retour du plancher est à {{ retour }} °C.{% endif %}
 
+      # LES DEUX ÉCARTS NE VEULENT RIEN DIRE COMPRESSEUR À L'ARRÊT : l'eau
+      # stagne et les sondes s'équilibrent. Relevé du 22.09.2026, tout le
+      # circuit à 24 °C, saumure comprise : l'écart source valait -0,1 K,
+      # physiquement impossible en marche. D'où l'availability.
+      #
+      # SEUILS : valeurs de départ tirées de la littérature sur les planchers
+      # chauffants en géothermie, PAS de mesures sur cette installation — les
+      # compteurs ont été remis à zéro avec le nouveau système et rien n'a
+      # encore été observé en marche. À revoir après une saison de chauffe.
+      - name: "PAC écart chauffage"
+        unique_id: pac_ecart_chauffage
+        unit_of_measurement: "K"
+        state_class: measurement
+        icon: mdi:delta
+        availability: >-
+          {{ is_state('binary_sensor.luxtronik_300722_07_compressor', 'on')
+             and has_value('sensor.luxtronik_300722_07_flow_in_temperature')
+             and has_value('sensor.luxtronik_300722_07_flow_out_temperature') }}
+        state: >-
+          {{ (states('sensor.luxtronik_300722_07_flow_in_temperature') | float(0)
+              - states('sensor.luxtronik_300722_07_flow_out_temperature') | float(0)) | round(1) }}
+        attributes:
+          # 3 à 7 K : plage usuelle d'un plancher chauffant. Sous 2 K, la
+          # circulation est trop rapide ou la PAC module à vide ; au-dessus de
+          # 8 K, le débit est trop faible.
+          verdict: >-
+            {% set d = (states('sensor.luxtronik_300722_07_flow_in_temperature') | float(0)
+                        - states('sensor.luxtronik_300722_07_flow_out_temperature') | float(0)) %}
+            {% if d < 2 %}Très faible : la circulation est rapide, ou la PAC module à vide.
+            {% elif d <= 7 %}Normal pour un plancher chauffant.
+            {% elif d <= 8 %}Un peu élevé : le débit commence à manquer.
+            {% else %}Élevé : le débit du circuit est trop faible.{% endif %}
+
+      - name: "PAC écart source"
+        unique_id: pac_ecart_source
+        unit_of_measurement: "K"
+        state_class: measurement
+        icon: mdi:earth
+        availability: >-
+          {{ is_state('binary_sensor.luxtronik_300722_07_compressor', 'on')
+             and has_value('sensor.luxtronik_300722_07_heat_source_input_temperature')
+             and has_value('sensor.luxtronik_300722_07_heat_source_output_temperature') }}
+        state: >-
+          {{ (states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0)
+              - states('sensor.luxtronik_300722_07_heat_source_output_temperature') | float(0)) | round(1) }}
+        attributes:
+          # 2 à 5 K : plage usuelle. Au-dessus de 6 K, soit le débit de saumure
+          # faiblit, soit le terrain ne rend plus assez.
+          verdict: >-
+            {% set d = (states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0)
+                        - states('sensor.luxtronik_300722_07_heat_source_output_temperature') | float(0)) %}
+            {% if d < 2 %}Faible : on prend peu de chaleur au terrain.
+            {% elif d <= 5 %}Normal : le terrain rend bien.
+            {% elif d <= 6 %}Un peu élevé : à surveiller.
+            {% else %}Élevé : débit de saumure faible, ou terrain qui ne suit plus.{% endif %}
+
       - name: "PAC température du sol"
         unique_id: pac_temperature_du_sol
         unit_of_measurement: "°C"
@@ -150,3 +206,15 @@ template:
         state: >-
           {{ states('sensor.luxtronik_300722_07_heat_source_input_temperature')
              | float(0) | round(1) }}
+        attributes:
+          # Au-dessus de 0 °C en saison de chauffe, confortable ; sous -5 °C,
+          # le terrain est sollicité au-delà de sa plage habituelle. Ce
+          # verdict-là reste valable à l'arrêt : c'est une température, pas un
+          # écart.
+          verdict: >-
+            {% set t = states('sensor.luxtronik_300722_07_heat_source_input_temperature') | float(0) %}
+            {% if t < -5 %}Très froid : le terrain est sollicité au-delà de sa plage habituelle.
+            {% elif t < 0 %}Froid, mais dans la plage d'une fin d'hiver.
+            {% elif t < 15 %}Normal pour un terrain en saison de chauffe.
+            {% else %}Tiède : le terrain s'est rechargé, typique de l'été.{% endif %}
+
