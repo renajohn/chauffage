@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" role="img"
+     aria-label="Circuit de la pompe à chaleur géothermique">
+  <!-- Schéma de fond de la carte picture-elements du tableau PAC.
+       Aucune valeur n'est écrite ici : les températures et les pompes sont
+       posées par-dessus par la carte, en positionnement pourcentage.
+       Les teintes sont portées par le SVG lui-même et non héritées du thème :
+       picture-elements sert cette image comme une image, elle ne suit pas le
+       mode clair ou sombre. Elles sont donc choisies pour tenir sur les deux.
+       Repères de position en % : voir l'en-tête de la tâche 6 du plan. -->
+  <defs>
+    <marker id="fleche" viewBox="0 0 10 10" refX="8" refY="5"
+            markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Le sol -->
+  <rect x="20" y="250" width="160" height="130" rx="8" fill="#78350f" opacity="0.35"/>
+  <text x="100" y="242" text-anchor="middle" font-family="sans-serif"
+        font-size="15" fill="#94a3b8">Le sol</text>
+  <path d="M40 290 h120 M40 320 h120 M40 350 h120" stroke="#0ea5e9"
+        stroke-width="5" fill="none" stroke-linecap="round" opacity="0.8"/>
+
+  <!-- Saumure : du sol vers la PAC, puis retour au sol -->
+  <path d="M180 290 H300" stroke="#0ea5e9" stroke-width="5" fill="none"
+        marker-end="url(#fleche)"/>
+  <path d="M300 350 H180" stroke="#38bdf8" stroke-width="5" fill="none"
+        marker-end="url(#fleche)" opacity="0.7"/>
+
+  <!-- La pompe à chaleur -->
+  <rect x="300" y="120" width="200" height="230" rx="14" fill="#1e293b"
+        stroke="#475569" stroke-width="3"/>
+  <text x="400" y="150" text-anchor="middle" font-family="sans-serif"
+        font-size="16" fill="#e2e8f0">Pompe à chaleur</text>
+  <circle cx="400" cy="250" r="34" fill="none" stroke="#f59e0b" stroke-width="4"/>
+  <text x="400" y="256" text-anchor="middle" font-family="sans-serif"
+        font-size="13" fill="#f59e0b">compresseur</text>
+
+  <!-- Départ vers la maison, retour de la maison -->
+  <path d="M500 170 H660" stroke="#ef4444" stroke-width="5" fill="none"
+        marker-end="url(#fleche)"/>
+  <path d="M660 300 H500" stroke="#60a5fa" stroke-width="5" fill="none"
+        marker-end="url(#fleche)"/>
+
+  <!-- Le ballon d'eau chaude -->
+  <rect x="660" y="40" width="110" height="130" rx="40" fill="#7c2d12"
+        opacity="0.45" stroke="#fb923c" stroke-width="3"/>
+  <text x="715" y="32" text-anchor="middle" font-family="sans-serif"
+        font-size="15" fill="#94a3b8">Ballon</text>
+
+  <!-- Le plancher chauffant -->
+  <rect x="660" y="250" width="110" height="110" rx="8" fill="#0f172a"
+        stroke="#475569" stroke-width="3"/>
+  <path d="M676 276 h78 M676 300 h78 M676 324 h78" stroke="#ef4444"
+        stroke-width="4" fill="none" stroke-linecap="round" opacity="0.75"/>
+  <text x="715" y="378" text-anchor="middle" font-family="sans-serif"
+        font-size="15" fill="#94a3b8">Plancher</text>
+
+  <!-- Dérivation du départ vers le ballon -->
+  <path d="M600 170 V105 H660" stroke="#ef4444" stroke-width="5" fill="none"
+        marker-end="url(#fleche)" opacity="0.85"/>
+</svg>
